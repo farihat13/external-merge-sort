@@ -1,0 +1,29 @@
+Rough Timeline   | Tasks
+----------------|----------------------------------------
+February 12, 2024 | Pair Finalisation, Complete Code walk through
+February 26, 2024 | Define class for data records
+March 11, 2024    | Add predicate evaluation to FilterIterator
+March 25, 2024    | Add in-memory sorting, duplicate removal
+April 8, 2024     | Add Plan & Iterator that verify a set of rows, Performance Testing and optimization
+April 22, 2024    | Performance Testing and optimization
+April 29, 2024    | Submission
+
+
+Milestones :
+...
+Trace existing code
+Disable (not remove!) excessive tracing output
+Define class for data records
+Add data records (incl mem mgmt) to iterators
+Add data generation (random values) in ScanIterator
+Test with simple plan -- scan only
+Add predicate evaluation to FilterIterator
+Test with moderate plan -- scan & filter
+Add in-memory sorting -- eg 10, 100, 1000 rows
+Add duplicate removal  -- eg. sort and eliminate duplicates
+Test with moderate plan -- scan & sort
+Add Plan & Iterator that verify a sort order
+Test with 0 rows and with 1 row, also 2, 3, 7 rows
+Add Plan & Iterator that verify a set of rows
+Test with 0, 1, 2, 3, 10, 29, 100, 576, 1000 rows
+...
