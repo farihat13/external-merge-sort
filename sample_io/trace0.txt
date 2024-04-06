@@ -1,0 +1,116 @@
+STATE -> SORT_MINI_RUNS: Sort cache-size mini runs
+STATE -> SPILL_RUNS_SSD: Spill sorted runs to the SSD device
+ACCESS -> A write to SSD was made with size 120240 bytes and latency 896us
+STATE -> MERGE_RUNS_SSD: Merge sorted runs on the SSD device
+STATE -> READ_RUN_PAGES_SSD: Read sorted run pages from the SSD device
+ACCESS -> A read to SSD was made with size 10020 bytes and latency 606us
+STATE -> SPILL_RUNS_HDD: Spill sorted runs to the HDD device
+ACCESS -> A write to HDD was made with size 10020 bytes and latency 591us
+STATE -> READ_RUN_PAGES_SSD: Read sorted run pages from the SSD device
+ACCESS -> A read to SSD was made with size 10020 bytes and latency 811us
+STATE -> SPILL_RUNS_HDD: Spill sorted runs to the HDD device
+ACCESS -> A write to HDD was made with size 10020 bytes and latency 399us
+STATE -> READ_RUN_PAGES_SSD: Read sorted run pages from the SSD device
+ACCESS -> A read to SSD was made with size 10020 bytes and latency 505us
+STATE -> SPILL_RUNS_HDD: Spill sorted runs to the HDD device
+ACCESS -> A write to HDD was made with size 10020 bytes and latency 516us
+STATE -> READ_RUN_PAGES_SSD: Read sorted run pages from the SSD device
+ACCESS -> A read to SSD was made with size 10020 bytes and latency 410us
+STATE -> SPILL_RUNS_HDD: Spill sorted runs to the HDD device
+ACCESS -> A write to HDD was made with size 10020 bytes and latency 579us
+STATE -> READ_RUN_PAGES_SSD: Read sorted run pages from the SSD device
+ACCESS -> A read to SSD was made with size 10020 bytes and latency 606us
+STATE -> SPILL_RUNS_HDD: Spill sorted runs to the HDD device
+ACCESS -> A write to HDD was made with size 10020 bytes and latency 335us
+STATE -> READ_RUN_PAGES_SSD: Read sorted run pages from the SSD device
+ACCESS -> A read to SSD was made with size 10020 bytes and latency 318us
+STATE -> SPILL_RUNS_HDD: Spill sorted runs to the HDD device
+ACCESS -> A write to HDD was made with size 10020 bytes and latency 523us
+STATE -> READ_RUN_PAGES_SSD: Read sorted run pages from the SSD device
+ACCESS -> A read to SSD was made with size 10020 bytes and latency 430us
+STATE -> SPILL_RUNS_HDD: Spill sorted runs to the HDD device
+ACCESS -> A write to HDD was made with size 10020 bytes and latency 442us
+STATE -> READ_RUN_PAGES_SSD: Read sorted run pages from the SSD device
+ACCESS -> A read to SSD was made with size 10020 bytes and latency 405us
+STATE -> SPILL_RUNS_HDD: Spill sorted runs to the HDD device
+ACCESS -> A write to HDD was made with size 10020 bytes and latency 504us
+STATE -> READ_RUN_PAGES_SSD: Read sorted run pages from the SSD device
+ACCESS -> A read to SSD was made with size 10020 bytes and latency 406us
+STATE -> SPILL_RUNS_HDD: Spill sorted runs to the HDD device
+ACCESS -> A write to HDD was made with size 10020 bytes and latency 385us
+STATE -> READ_RUN_PAGES_SSD: Read sorted run pages from the SSD device
+ACCESS -> A read to SSD was made with size 10020 bytes and latency 477us
+STATE -> SPILL_RUNS_HDD: Spill sorted runs to the HDD device
+ACCESS -> A write to HDD was made with size 10020 bytes and latency 305us
+STATE -> READ_RUN_PAGES_SSD: Read sorted run pages from the SSD device
+ACCESS -> A read to SSD was made with size 10020 bytes and latency 304us
+STATE -> SPILL_RUNS_HDD: Spill sorted runs to the HDD device
+ACCESS -> A write to HDD was made with size 10020 bytes and latency 631us
+STATE -> READ_RUN_PAGES_SSD: Read sorted run pages from the SSD device
+ACCESS -> A read to SSD was made with size 10020 bytes and latency 462us
+STATE -> SPILL_RUNS_HDD: Spill sorted runs to the HDD device
+ACCESS -> A write to HDD was made with size 10020 bytes and latency 418us
+STATE -> READ_RUN_PAGES_SSD: Read sorted run pages from the SSD device
+ACCESS -> A read to SSD was made with size 10020 bytes and latency 659us
+STATE -> SPILL_RUNS_HDD: Spill sorted runs to the HDD device
+ACCESS -> A write to HDD was made with size 0 bytes and latency 319us
+STATE -> MERGE_RUNS_HDD: Merge sorted runs on the HDD device
+STATE -> READ_RUN_PAGES_HDD: Read sorted run pages from the HDD device
+ACCESS -> A read to HDD was made with size 1048092 bytes and latency 1699us
+STATE -> SPILL_RUNS_SSD: Spill sorted runs to the SSD device
+ACCESS -> A write to SSD was made with size 120240 bytes and latency 1091us
+STATE -> MERGE_RUNS_SSD: Merge sorted runs on the SSD device
+STATE -> READ_RUN_PAGES_SSD: Read sorted run pages from the SSD device
+ACCESS -> A read to SSD was made with size 10020 bytes and latency 519us
+STATE -> SPILL_RUNS_HDD: Spill sorted runs to the HDD device
+ACCESS -> A write to HDD was made with size 10020 bytes and latency 594us
+STATE -> READ_RUN_PAGES_SSD: Read sorted run pages from the SSD device
+ACCESS -> A read to SSD was made with size 10020 bytes and latency 407us
+STATE -> SPILL_RUNS_HDD: Spill sorted runs to the HDD device
+ACCESS -> A write to HDD was made with size 10020 bytes and latency 419us
+STATE -> READ_RUN_PAGES_SSD: Read sorted run pages from the SSD device
+ACCESS -> A read to SSD was made with size 10020 bytes and latency 410us
+STATE -> SPILL_RUNS_HDD: Spill sorted runs to the HDD device
+ACCESS -> A write to HDD was made with size 10020 bytes and latency 509us
+STATE -> READ_RUN_PAGES_SSD: Read sorted run pages from the SSD device
+ACCESS -> A read to SSD was made with size 10020 bytes and latency 515us
+STATE -> SPILL_RUNS_HDD: Spill sorted runs to the HDD device
+ACCESS -> A write to HDD was made with size 10020 bytes and latency 446us
+STATE -> READ_RUN_PAGES_SSD: Read sorted run pages from the SSD device
+ACCESS -> A read to SSD was made with size 10020 bytes and latency 410us
+STATE -> SPILL_RUNS_HDD: Spill sorted runs to the HDD device
+ACCESS -> A write to HDD was made with size 10020 bytes and latency 473us
+STATE -> READ_RUN_PAGES_SSD: Read sorted run pages from the SSD device
+ACCESS -> A read to SSD was made with size 10020 bytes and latency 390us
+STATE -> SPILL_RUNS_HDD: Spill sorted runs to the HDD device
+ACCESS -> A write to HDD was made with size 10020 bytes and latency 415us
+STATE -> READ_RUN_PAGES_SSD: Read sorted run pages from the SSD device
+ACCESS -> A read to SSD was made with size 10020 bytes and latency 477us
+STATE -> SPILL_RUNS_HDD: Spill sorted runs to the HDD device
+ACCESS -> A write to HDD was made with size 10020 bytes and latency 409us
+STATE -> READ_RUN_PAGES_SSD: Read sorted run pages from the SSD device
+ACCESS -> A read to SSD was made with size 10020 bytes and latency 364us
+STATE -> SPILL_RUNS_HDD: Spill sorted runs to the HDD device
+ACCESS -> A write to HDD was made with size 10020 bytes and latency 775us
+STATE -> READ_RUN_PAGES_SSD: Read sorted run pages from the SSD device
+ACCESS -> A read to SSD was made with size 10020 bytes and latency 473us
+STATE -> SPILL_RUNS_HDD: Spill sorted runs to the HDD device
+ACCESS -> A write to HDD was made with size 10020 bytes and latency 556us
+STATE -> READ_RUN_PAGES_SSD: Read sorted run pages from the SSD device
+ACCESS -> A read to SSD was made with size 10020 bytes and latency 351us
+STATE -> SPILL_RUNS_HDD: Spill sorted runs to the HDD device
+ACCESS -> A write to HDD was made with size 10020 bytes and latency 398us
+STATE -> READ_RUN_PAGES_SSD: Read sorted run pages from the SSD device
+ACCESS -> A read to SSD was made with size 10020 bytes and latency 477us
+STATE -> SPILL_RUNS_HDD: Spill sorted runs to the HDD device
+ACCESS -> A write to HDD was made with size 10020 bytes and latency 721us
+STATE -> READ_RUN_PAGES_SSD: Read sorted run pages from the SSD device
+ACCESS -> A read to SSD was made with size 10020 bytes and latency 543us
+STATE -> SPILL_RUNS_HDD: Spill sorted runs to the HDD device
+ACCESS -> A write to HDD was made with size 10020 bytes and latency 324us
+STATE -> READ_RUN_PAGES_SSD: Read sorted run pages from the SSD device
+ACCESS -> A read to SSD was made with size 10020 bytes and latency 596us
+STATE -> SPILL_RUNS_HDD: Spill sorted runs to the HDD device
+ACCESS -> A write to HDD was made with size 0 bytes and latency 338us
+STATE -> READ_RUN_PAGES_HDD: Read sorted run pages from the HDD device
+ACCESS -> A read to HDD was made with size 1048092 bytes and latency 1814us

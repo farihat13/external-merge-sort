@@ -27,3 +27,14 @@ Test with 0 rows and with 1 row, also 2, 3, 7 rows
 Add Plan & Iterator that verify a set of rows
 Test with 0, 1, 2, 3, 10, 29, 100, 576, 1000 rows
 ...
+
+
+Sample I/O:
+Hello Everyone,
+I have uploaded sample input, output, and trace file in the media folder. 
+Let me know if you have any problem accessing the same.
+There 20 records and each of size 1024 bytes.
+Regarding how to test your project: you can use the CSL machine the department 
+has and also use Docker to test out. Docker provides flexibility with memory 
+but the hiccup is to write a Dockerfile for your project.
+Thank You

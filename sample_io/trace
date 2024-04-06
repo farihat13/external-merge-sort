@@ -1,0 +1,38 @@
+ACCESS -> A write to ./HDD was made with size 10260 bytes and latency 437us
+STATE -> MERGE_RUNS_HDD: Merge sorted runs on the HDD device
+STATE -> SORT_MINI_RUNS: Sort cache-size mini runs
+STATE -> SPILL_RUNS_./SSD: Spill sorted runs to the ./SSD device
+ACCESS -> A write to ./SSD was made with size 20520 bytes and latency 729us
+STATE -> MERGE_RUNS_SSD: Merge sorted runs on the SSD device
+STATE -> READ_RUN_PAGES_./SSD: Read sorted run pages from the ./SSD device
+ACCESS -> A read to ./SSD was made with size 10260 bytes and latency 407us
+STATE -> SPILL_RUNS_./HDD: Spill sorted runs to the ./HDD device
+ACCESS -> A write to ./HDD was made with size 10260 bytes and latency 980us
+STATE -> READ_RUN_PAGES_./SSD: Read sorted run pages from the ./SSD device
+ACCESS -> A read to ./SSD was made with size 10260 bytes and latency 490us
+STATE -> SPILL_RUNS_./HDD: Spill sorted runs to the ./HDD device
+ACCESS -> A write to ./HDD was made with size 10260 bytes and latency 569us
+STATE -> READ_RUN_PAGES_./SSD: Read sorted run pages from the ./SSD device
+ACCESS -> A read to ./SSD was made with size 10260 bytes and latency 805us
+STATE -> SPILL_RUNS_./HDD: Spill sorted runs to the ./HDD device
+ACCESS -> A write to ./HDD was made with size 0 bytes and latency 398us
+STATE -> MERGE_RUNS_HDD: Merge sorted runs on the HDD device
+STATE -> READ_RUN_PAGES_./HDD: Read sorted run pages from the ./HDD device
+ACCESS -> A read to ./HDD was made with size 1048572 bytes and latency 1218us
+STATE -> SPILL_RUNS_./SSD: Spill sorted runs to the ./SSD device
+ACCESS -> A write to ./SSD was made with size 20520 bytes and latency 599us
+STATE -> MERGE_RUNS_SSD: Merge sorted runs on the SSD device
+STATE -> READ_RUN_PAGES_./SSD: Read sorted run pages from the ./SSD device
+ACCESS -> A read to ./SSD was made with size 10260 bytes and latency 915us
+STATE -> SPILL_RUNS_./HDD: Spill sorted runs to the ./HDD device
+ACCESS -> A write to ./HDD was made with size 10260 bytes and latency 784us
+STATE -> READ_RUN_PAGES_./SSD: Read sorted run pages from the ./SSD device
+ACCESS -> A read to ./SSD was made with size 10260 bytes and latency 865us
+STATE -> SPILL_RUNS_./HDD: Spill sorted runs to the ./HDD device
+ACCESS -> A write to ./HDD was made with size 10260 bytes and latency 1112us
+STATE -> READ_RUN_PAGES_./SSD: Read sorted run pages from the ./SSD device
+ACCESS -> A read to ./SSD was made with size 10260 bytes and latency 1490us
+STATE -> SPILL_RUNS_./HDD: Spill sorted runs to the ./HDD device
+ACCESS -> A write to ./HDD was made with size 0 bytes and latency 887us
+STATE -> READ_RUN_PAGES_./HDD: Read sorted run pages from the ./HDD device
+ACCESS -> A read to ./HDD was made with size 1048572 bytes and latency 782us

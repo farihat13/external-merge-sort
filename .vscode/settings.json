@@ -1,0 +1,27 @@
+{
+    "files.associations": {
+        "x86.h": "c",
+        "stat.h": "c",
+        "mmu.h": "c",
+        "memlayout.h": "c",
+        "user.h": "c",
+        "fcntl.h": "c",
+        "fs.h": "c",
+        "wmap.h": "c"
+    },
+    "C_Cpp.clang_format_style": "{ BasedOnStyle: LLVM, IndentWidth: 4, TabWidth: 4, ColumnLimit: 0, SortIncludes: false, BreakBeforeBraces: BS_Linux }",
+    "todohighlight.keywords": [
+        {
+            "text": "TODO",
+            "color": "red",
+            "backgroundColor": "#F7F799",
+            "overviewRulerColor": "grey"
+        },
+        {
+            "text": "NOTE",
+            "color": "#FFA500",
+            "backgroundColor": "transparent",
+            "overviewRulerColor": "grey"
+        }
+    ],
+}
