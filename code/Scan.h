@@ -1,4 +1,8 @@
+#ifndef SCAN_H
+#define SCAN_H
+
 #include "Iterator.h"
+#include <fstream>
 
 
 class ScanPlan : public Plan {
@@ -19,10 +23,15 @@ class ScanIterator : public Iterator {
     ScanIterator(ScanPlan const *const plan);
     ~ScanIterator();
     bool next();
+    void getRecord(char *s);
 
   private:
     ScanPlan const *const _plan;
     RowCount _count;
 
+    std::ifstream file;
+
     void gen_a_record(char *s, const int len);
 }; // class ScanIterator
+
+#endif // SCAN_H

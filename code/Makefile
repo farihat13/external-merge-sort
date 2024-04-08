@@ -1,8 +1,8 @@
 CPPOPT=-g -Og #-D_DEBUG
 # -O2 -Os -Ofast
 # -fprofile-generate -fprofile-use
-CPPFLAGS=$(CPPOPT) -Wall -ansi -pedantic -std=c++11 \
--Wparentheses -Wno-unused-parameter -Wformat-security
+CPPFLAGS=$(CPPOPT) -Wall -ansi -pedantic -std=c++11 
+# -Wparentheses -Wno-unused-parameter -Wformat-security
 # -fno-rtti -std=c++11 -std=c++98
 
 # documents and scripts
@@ -11,13 +11,15 @@ SCRS=
 
 # headers and code sources
 HDRS=	defs.h \
-		Iterator.h Scan.h Filter.h Sort.h
+		Iterator.h Scan.h Filter.h Sort.h \
+		config.h
 SRCS=	defs.cpp Assert.cpp ExternalSort.cpp \
 		Iterator.cpp Scan.cpp Filter.cpp Sort.cpp
 
 # compilation targets
 OBJS=	defs.o Assert.o ExternalSort.o \
-		Iterator.o Scan.o Filter.o Sort.o
+		Iterator.o Scan.o Filter.o Sort.o \
+		config.o
 
 # RCS assists
 REV=-q -f
@@ -33,8 +35,8 @@ trace : ExternalSort.exe Makefile
 	./ExternalSort.exe >> trace
 	@size -t ExternalSort.exe $(OBJS) | sort -r >> trace
 
-$(OBJS) : Makefile defs.h
-ExternalSort.o : Iterator.h Scan.h Filter.h Sort.h
+$(OBJS) : Makefile defs.h config.h 
+ExternalSort.o : Iterator.h Scan.h Filter.h Sort.h 
 Iterator.o Scan.o Filter.o Sort.o : Iterator.h
 Scan.o : Scan.h
 Filter.o : Filter.h

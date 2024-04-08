@@ -1,3 +1,6 @@
+#ifndef FILTER_H
+#define FILTER_H
+
 #include "Iterator.h"
 
 
@@ -25,3 +28,5 @@ class FilterIterator : public Iterator {
     Iterator *const _input;
     RowCount _consumed, _produced;
 }; // class FilterIterator
+
+#endif // FILTER_H

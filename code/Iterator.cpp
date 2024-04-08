@@ -13,8 +13,8 @@ Iterator::~Iterator() { TRACE(true); } // Iterator::~Iterator
 void Iterator::run() {
     TRACE(true);
 
-    while (next())
+    while (next()) {
         ++_count;
-
+    }
     traceprintf("entire plan produced %lu rows\n", (unsigned long)_count);
 } // Iterator::run

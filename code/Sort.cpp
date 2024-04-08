@@ -25,8 +25,9 @@ SortIterator::SortIterator(SortPlan const *const plan)
     // 2. Store runs on disk
     // 3. Initialize merge process
 
-    while (_input->next())
+    while (_input->next()) {
         ++_consumed;
+    }
     delete _input;
 
     traceprintf("consumed %lu rows\n", (unsigned long)(_consumed));

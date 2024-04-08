@@ -1,11 +1,11 @@
-#pragma once
+#ifndef ITERATOR_H
+#define ITERATOR_H
 
 #include "defs.h"
 
 typedef uint64_t RowCount;
 
-class Plan
-{
+class Plan {
     friend class Iterator;
 
   public:
@@ -16,8 +16,7 @@ class Plan
   private:
 }; // class Plan
 
-class Iterator
-{
+class Iterator {
   public:
     Iterator();
     virtual ~Iterator();
@@ -27,3 +26,5 @@ class Iterator
   private:
     RowCount _count;
 }; // class Iterator
+
+#endif // ITERATOR_H

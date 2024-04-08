@@ -2,9 +2,12 @@
 #include "Scan.h"
 #include "Filter.h"
 #include "Sort.h"
-#include "params.h"
-
+#include "defs.h"
+#include "config.h"
 #include <cstring>
+#include <cstdlib>
+#include <cstdio>
+#include <string>
 
 
 /**
@@ -16,7 +19,7 @@
  * ./ExternalSort.exe -c 20 -s 1024 -o trace0.txt
  * @ return Input
  */
-Input *read_cmdline_arguments(int argc, char *argv[]) {
+void read_cmdline_arguments(int argc, char *argv[]) {
     if (argc < 2) {
         fprintf(
             stderr,
@@ -55,22 +58,22 @@ Input *read_cmdline_arguments(int argc, char *argv[]) {
             exit(1);
         }
     }
-
-    Input *input = new Input(num_records, record_size, output_file);
-    return input;
+    Config::RECORD_SIZE = record_size;
+    Config::NUM_RECORDS = num_records;
+    Config::OUTPUT_FILE = output_file;
 } // read_cmdline_arguments
 
 
 int main(int argc, char *argv[]) {
 
-    Input *input = read_cmdline_arguments(argc, argv);
-    // input->print();
-    // StorageConfig::configToString();
+    read_cmdline_arguments(argc, argv);
+    Config::print_config();
 
 
     TRACE(true);
 
-    Plan *const plan = new ScanPlan(7);
+    Plan *const plan = new SortPlan(new ScanPlan(Config::NUM_RECORDS));
+    // new ScanPlan(Config::NUM_RECORDS);
     // new SortPlan ( new FilterPlan ( new ScanPlan (7) ) );
 
     Iterator *const it = plan->init();

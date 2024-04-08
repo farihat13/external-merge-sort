@@ -1,15 +1,15 @@
-#pragma once
+#ifndef DEFS_H
+#define DEFS_H
 
 #include <stddef.h>
 #include <stdint.h>
 #include <cstdio>
-#include <params.h>
 
 typedef uint8_t byte;
 
 #define slotsof(a) (sizeof(a) / sizeof(a[0]))
 
-#define nullptr ((void *)NULL)
+// #define nullptr ((void *)NULL)
 
 #define yesno(b) ((b) ? "yes" : "no")
 
@@ -127,3 +127,6 @@ size_t msb(size_t const x);
 int msbi(size_t const x);
 char const *YesNo(bool const b);
 char const *OkBad(bool const b);
+
+
+#endif // DEFS_H
