@@ -1,15 +1,5 @@
 {
-    "files.associations": {
-        "x86.h": "c",
-        "stat.h": "c",
-        "mmu.h": "c",
-        "memlayout.h": "c",
-        "user.h": "c",
-        "fcntl.h": "c",
-        "fs.h": "c",
-        "wmap.h": "c"
-    },
-    "C_Cpp.clang_format_style": "{ BasedOnStyle: LLVM, IndentWidth: 4, TabWidth: 4, ColumnLimit: 0, SortIncludes: false, BreakBeforeBraces: BS_Linux }",
+    "C_Cpp.clang_format_style": "{ BasedOnStyle: LLVM, IndentWidth: 4, TabWidth: 4, ColumnLimit: 80, SortIncludes: false, MaxEmptyLinesToKeep: 2}",
     "todohighlight.keywords": [
         {
             "text": "TODO",

@@ -141,9 +141,25 @@ Ref:
 
 The choice of fan-in can impact the efficiency of the merge process. Higher fan-in values can reduce the number of merge passes required to merge all the runs, thereby minimizing disk I/O operations and improving overall performance. However, excessively high fan-in values can lead to increased memory usage and may not be optimal for all systems.
 
-**Fan-out** represents the number of output streams or merged runs produced after each merge operation. As sorted runs are merged together, the resulting merged runs may be further divided or split into multiple streams for subsequent merge operations. For example, if a merged run is split into four streams, the fan-out is 4.
+**Fan-out** represents the number of output streams or merged runs produced after each merge operation. As sorted runs are merged together, the resulting merged runs may be further divided or split into multiple streams for subsequent merge operations.
+
+For example, if a merged run is split into four streams, the fan-out is 4.
 Higher fan-out values can lead to faster reduction of sorted runs and fewer merge passes, but they may require more complex management of disk I/O and intermediate storage.
 
 ## Graceful degradation
 
 External merge sort can dynamically adjust its memory usage based on the available resources. If there is sufficient memory, it can allocate more space for in-memory sorting and merging operations, leading to faster performance. However, if memory becomes limited, the algorithm can gracefully degrade by reducing the memory footprint and relying more on disk-based operations.
+
+## Sort order
+
+4] Please use strcmp() as the data is alphanumeric.
+
+## Output buffer page size
+
+You can estimate the size of the output buffer page in DRAM based on system-level latency and bandwidth metrics. You cannot use the SSD latency and bandwidth for DRAM.
+
+If your system has a measured average memory access latency of, say, 100 nanoseconds (ns) and a memory bandwidth of 100 GB/s (gigabytes per second), you can estimate the buffer page size: Page Size≈100 ns×100 GB/s=100 GB×1001,000,000=10 kilobytes (KB)Page Size≈100 ns×100 GB/s=100 GB×1,000,000100​=10 kilobytes (KB)
+
+## Replacement Selection
+
+<https://stackoverflow.com/questions/16326689/replacement-selection-sort-v-selection-sort>

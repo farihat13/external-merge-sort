@@ -3,18 +3,18 @@
 #include "Filter.h"
 #include "Sort.h"
 
-int main (int argc, char * argv [])
-{
-	TRACE (true);
 
-	Plan * const plan = new ScanPlan (7);
-	// new SortPlan ( new FilterPlan ( new ScanPlan (7) ) );
+int main(int argc, char *argv[]) {
+    TRACE(true);
 
-	Iterator * const it = plan->init ();
-	it->run ();
-	delete it;
+    Plan *const plan = new ScanPlan(7);
+    // new SortPlan ( new FilterPlan ( new ScanPlan (7) ) );
 
-	delete plan;
+    Iterator *const it = plan->init();
+    it->run();
+    delete it;
 
-	return 0;
+    delete plan;
+
+    return 0;
 } // main

@@ -30,3 +30,8 @@
 *.exe
 *.out
 *.app
+
+# Custom for this project
+*.log
+*.out
+move.sh
