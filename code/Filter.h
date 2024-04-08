@@ -22,6 +22,7 @@ class FilterIterator : public Iterator {
     FilterIterator(FilterPlan const *const plan);
     ~FilterIterator();
     bool next();
+    void getRecord(Record *r);
 
   private:
     FilterPlan const *const _plan;

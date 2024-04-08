@@ -42,3 +42,9 @@ bool FilterIterator::next() {
     ++_produced;
     return true;
 } // FilterIterator::next
+
+void FilterIterator::getRecord(Record *r) {
+    TRACE(true);
+
+    _input->getRecord(r);
+} // FilterIterator::getRecord

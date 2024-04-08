@@ -21,16 +21,15 @@
  */
 void read_cmdline_arguments(int argc, char *argv[]) {
     if (argc < 2) {
-        fprintf(
-            stderr,
-            "Usage: %s -c <num_records> -s <record_size> -o <output_file>\n",
-            argv[0]);
+        fprintf(stderr,
+                "Usage: %s -c <num_records> -s <record_size> -o <trace_file>\n",
+                argv[0]);
         exit(1);
     }
 
     int num_records = 0;
     int record_size = 0;
-    std::string output_file = "";
+    std::string trace_file = "";
     for (int i = 1; i < argc; ++i) {
         if (strcmp(argv[i], "-c") == 0) {
             if (i + 1 < argc) {
@@ -48,7 +47,7 @@ void read_cmdline_arguments(int argc, char *argv[]) {
             }
         } else if (strcmp(argv[i], "-o") == 0) {
             if (i + 1 < argc) {
-                output_file = argv[++i];
+                trace_file = argv[++i];
             } else {
                 fprintf(stderr, "Option -o requires an argument.\n");
                 exit(1);
@@ -60,7 +59,8 @@ void read_cmdline_arguments(int argc, char *argv[]) {
     }
     Config::RECORD_SIZE = record_size;
     Config::NUM_RECORDS = num_records;
-    Config::OUTPUT_FILE = output_file;
+    Config::TRACE_FILE = trace_file;
+
 } // read_cmdline_arguments
 
 
@@ -68,6 +68,7 @@ int main(int argc, char *argv[]) {
 
     read_cmdline_arguments(argc, argv);
     Config::print_config();
+    Logger::init(Config::TRACE_FILE);
 
 
     TRACE(true);
@@ -78,9 +79,10 @@ int main(int argc, char *argv[]) {
 
     Iterator *const it = plan->init();
     it->run();
-    delete it;
 
+    delete it;
     delete plan;
+    Logger::close();
 
     return 0;
 } // main

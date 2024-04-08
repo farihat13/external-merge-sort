@@ -23,7 +23,7 @@ class ScanIterator : public Iterator {
     ScanIterator(ScanPlan const *const plan);
     ~ScanIterator();
     bool next();
-    void getRecord(char *s);
+    void getRecord(Record *r);
 
   private:
     ScanPlan const *const _plan;

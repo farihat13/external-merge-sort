@@ -23,6 +23,7 @@ class SortIterator : public Iterator {
     SortIterator(SortPlan const *const plan);
     ~SortIterator();
     bool next();
+    void getRecord(Record *r);
 
   private:
     SortPlan const *const _plan;

@@ -2,6 +2,7 @@
 #define ITERATOR_H
 
 #include "defs.h"
+#include "Record.h"
 
 typedef uint64_t RowCount;
 
@@ -22,6 +23,7 @@ class Iterator {
     virtual ~Iterator();
     void run();
     virtual bool next() = 0;
+    virtual void getRecord(Record *r) = 0;
 
   private:
     RowCount _count;

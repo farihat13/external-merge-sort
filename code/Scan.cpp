@@ -44,6 +44,7 @@ void ScanIterator::gen_a_record(char *s, const int len) {
 
 ScanIterator::~ScanIterator() {
     TRACE(true);
+    this->file.close();
     traceprintf("produced %lu of %lu rows\n", (unsigned long)(_count),
                 (unsigned long)(_plan->_count));
 } // ScanIterator::~ScanIterator
@@ -57,8 +58,8 @@ bool ScanIterator::next() {
     return true;
 } // ScanIterator::next
 
-void ScanIterator::getRecord(char *s) {
+void ScanIterator::getRecord(Record *r) {
     TRACE(true);
-    file.read(s, Config::RECORD_SIZE);
+    this->file.read(r->_data, Config::RECORD_SIZE);
     ++_count;
 }

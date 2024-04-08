@@ -35,3 +35,5 @@
 *.log
 *.out
 move.sh
+code/input.txt
+code/trace
