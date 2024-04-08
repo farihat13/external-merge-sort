@@ -61,6 +61,7 @@ Dummy usage:
 ```c
 #include <iostream>
 #include <vector>
+#include <unordered_set>
 
 class Plan {
 public:
@@ -75,33 +76,37 @@ public:
 
 class FilterPlan : public Plan {
 public:
-    FilterPlan(std::vector<int> const& input) : _input(input) {}
+    FilterPlan(std::vector<int> const& input) {
+        for (const auto& i : input) {
+            _input.insert(i);
+        }
+    }
     ~FilterPlan() {}
 
     Iterator* init() const;
 
 private:
-    std::vector<int> const _input;
+    std::unordered_set<int> _input;
+    friend class FilterIterator;
 };
 
 class FilterIterator : public Iterator {
 public:
-    FilterIterator(FilterPlan const* const plan, int index = 0)
-        : _plan(plan), _index(index) {}
+    FilterIterator(FilterPlan const* const plan)
+        : _plan(plan), _it(_plan->_input.begin()) {}
     ~FilterIterator() {}
 
     bool next() {
-        while (_index < _plan->_input.size()) {
-            if (_plan->_input[_index++] % 2 != 0) {
-                return true;
-            }
+        if (_it != _plan->_input.end()) {
+            ++_it;
+            return _it != _plan->_input.end();
         }
         return false;
     }
 
 private:
     FilterPlan const* const _plan;
-    int _index;
+    std::unordered_set<int>::const_iterator _it;
 };
 
 Iterator* FilterPlan::init() const {
@@ -109,13 +114,36 @@ Iterator* FilterPlan::init() const {
 }
 
 int main() {
-    std::vector<int> data = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+    std::vector<int> data = {1, 2, 2, 3, 3, 3, 4, 4, 4, 4};
     FilterPlan plan(data);
     Iterator* it = plan.init();
     while (it->next()) {
-        std::cout << "Found an odd number.\n";
+        std::cout << "Found a unique number.\n";
     }
     delete it;
     return 0;
 }
 ```
+
+## Algorithm
+
+Ref:
+
+1. external merge sort
+    - [slide](https://thodrek.github.io/cs564-fall17/lectures/lecture-11/Lecture_11_ExtSort.pdf)
+    - [wiki](https://en.wikipedia.org/wiki/External_sorting)
+2. k-way merging
+    - [wiki](https://en.wikipedia.org/wiki/K-way_merge_algorithm)
+
+## Fan-in, Fan-out
+
+**Fan-in** represents the number of input streams or sorted runs that are merged together at each stage of the merge process. For example, if two sorted runs are merged together at a time, the fan-in is 2.
+
+The choice of fan-in can impact the efficiency of the merge process. Higher fan-in values can reduce the number of merge passes required to merge all the runs, thereby minimizing disk I/O operations and improving overall performance. However, excessively high fan-in values can lead to increased memory usage and may not be optimal for all systems.
+
+**Fan-out** represents the number of output streams or merged runs produced after each merge operation. As sorted runs are merged together, the resulting merged runs may be further divided or split into multiple streams for subsequent merge operations. For example, if a merged run is split into four streams, the fan-out is 4.
+Higher fan-out values can lead to faster reduction of sorted runs and fewer merge passes, but they may require more complex management of disk I/O and intermediate storage.
+
+## Graceful degradation
+
+External merge sort can dynamically adjust its memory usage based on the available resources. If there is sufficient memory, it can allocate more space for in-memory sorting and merging operations, leading to faster performance. However, if memory becomes limited, the algorithm can gracefully degrade by reducing the memory footprint and relying more on disk-based operations.

@@ -29,6 +29,27 @@ Test with 0, 1, 2, 3, 10, 29, 100, 576, 1000 rows
 ...
 
 
+test with inputs of 50 MB, 125 MB, 12 GB, and 120 GB
+record sizes 20Bytes to 2000 Bytes
+● 
+1 CPU core, 
+1 MB cache, (1048576 bytes)
+100 MB DRAM
+SSD: 10 GB capacity, 0.1 ms latency, 200 MB/s bandwidth
+HDD: ∞ capacity, 5 ms latency, 100 MB/s bandwidth
+Emulate SSD + HDD, report total latency & transfer time
+
+● 
+Extra credit: logic & performance evaluation for
+    ○ in-stream (after-sort) ‘distinct’, ‘group by’, or ‘top’
+    ○ in-sort ‘distinct’, ‘group by’, or ‘top’
+
+● Provided: iterator template & logic
+
+Efficient random data generation
+https://stackoverflow.com/questions/25298585/efficiently-generating-random-bytes-of-data-in-c11-14
+
+
 Sample I/O:
 Hello Everyone,
 I have uploaded sample input, output, and trace file in the media folder. 
