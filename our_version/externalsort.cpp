@@ -1,6 +1,25 @@
-#include "externalsort.h"
+#include "common.h"
+#include "storage.h"
+#include <algorithm>
+#include <cassert>
+#include <climits>
+#include <cstdarg>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <ctime>
+#include <fstream>
+#include <iostream>
+#include <string>
+#include <vector>
 
 
+/**
+ * @brief read command line arguments and update Config class
+ *
+ * @param argc
+ * @param argv
+ */
 void readCmdlineArgs(int argc, char *argv[]) {
     if (argc < 2) {
         fprintf(stderr,
@@ -42,7 +61,6 @@ void readCmdlineArgs(int argc, char *argv[]) {
     Config::RECORD_SIZE = record_size;
     Config::NUM_RECORDS = num_records;
     Config::TRACE_FILE = trace_file;
-
 } // readCmdlineArgs
 
 
@@ -59,6 +77,7 @@ void gen_a_record(char *s, const int len) {
 void generateInputFile(const std::string &filename, int recordSize,
                        int numRecords) {
     std::ofstream file(filename, std::ios::binary);
+    std::ofstream readablefile("readable_input.txt"); // TODO: remove later
     if (!file) {
         std::cerr << "Error opening file for writing." << std::endl;
         exit(1);
@@ -68,10 +87,21 @@ void generateInputFile(const std::string &filename, int recordSize,
     for (int i = 0; i < numRecords; ++i) {
         gen_a_record(record, Config::RECORD_SIZE);
         file.write(record, Config::RECORD_SIZE);
-        // file.write("\n", 1);
+        readablefile.write(record, Config::RECORD_SIZE);
+        readablefile.write("\n", 1);
     }
+    // clean up
     file.close();
-    printf("Generated %d records in file %s\n", numRecords, filename.c_str());
+    readablefile.close();
+    delete[] record;
+    printv("Generated %d records in file %s\n", numRecords, filename.c_str());
+
+#if defined(_DEBUG) || defined(DEBUG)
+    std::ifstream inputfile(filename, std::ios::binary);
+    inputfile.seekg(0, std::ios::end);
+    DebugAssert(inputfile.tellg() == numRecords * recordSize);
+    inputfile.close();
+#endif
 }
 
 void quickSort(Record *records, int n) { // In-memory
@@ -114,7 +144,7 @@ void externalSort(const std::string &inputFile, const std::string &outputFile,
     printf("each record size: %lu bytes\n", sizeof(Record));
     int i = 0;
     Record *dram = new Record[n_cache_in_dram * n_records_in_cache];
-    
+
     std::ofstream cacheFile("cache.tmp", std::ios::binary);
     while (true) {
         if (!file.read(dram[i++].data, Config::RECORD_SIZE)) {
@@ -168,12 +198,18 @@ void externalSort(const std::string &inputFile, const std::string &outputFile,
     // outputFileStream.close();
 }
 
+
+/**
+ * @brief Main function
+ * ./externalsort -c 20 -s 1024 -o trace
+ */
 int main(int argc, char *argv[]) {
     readCmdlineArgs(argc, argv);
+    printConfig();
 
     generateInputFile(Config::INPUT_FILE, Config::RECORD_SIZE,
                       Config::NUM_RECORDS);
-    externalSort(Config::INPUT_FILE, Config::OUTPUT_FILE, Config::RECORD_SIZE);
+    // externalSort(Config::INPUT_FILE, Config::OUTPUT_FILE, Config::RECORD_SIZE);
 
     return 0;
 }

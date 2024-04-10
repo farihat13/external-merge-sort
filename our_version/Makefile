@@ -1,16 +1,31 @@
-SRCS=$(wildcard *.cpp)
+# Compiler settings
+CPPOPT=-g -Og -D_DEBUG
+CXX = g++
+CXXFLAGS =$(CPPOPT) -Wall -std=c++11
 
-CPPFLAGS= -Wall -ansi -pedantic -std=c++11 
+# Object files
+OBJS = common.o storage.o externalsort.o
 
-OBJS=$(SRCS:.cpp=.o)
+# Executable name
+TARGET = externalsort
 
-TARGS=$(SRCS:.cpp=)
+# Build rules
+$(TARGET): $(OBJS)
+	$(CXX) $(CXXFLAGS) -o $(TARGET) $(OBJS)
 
-all: $(TARGS)
+common.o: common.cpp common.h
+	$(CXX) $(CXXFLAGS) -c common.cpp
 
-# $(TARGS): $(OBJS)
+storage.o: storage.cpp storage.h common.h
+	$(CXX) $(CXXFLAGS) -c storage.cpp
 
-# and finally, a clean line
-clean: 
-	rm -f $(OBJS) $(TARGS) *.out
+externalsort.o: externalsort.cpp storage.h common.h
+	$(CXX) $(CXXFLAGS) -c externalsort.cpp
 
+# run rule
+run: $(TARGET)
+	./$(TARGET) -c 100 -s 200 -o trace
+
+# Clean rule
+clean:
+	rm -f $(OBJS) $(TARGET)

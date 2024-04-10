@@ -35,10 +35,11 @@
 *.log
 *.out
 move.sh
-code/input*
+code/*input*
 code/trace*
 code/output*
 code/cache*
+our_version/*input*
 our_version/trace*
 our_version/output*
 our_version/cache*
