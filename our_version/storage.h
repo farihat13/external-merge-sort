@@ -13,10 +13,15 @@
 class DRAM {
   private:
     static DRAM *instance;
-    char *data;
-    DRAM() { data = new char[Config::DRAM_SIZE]; }
+    DRAM() {
+        this->data = new char[Config::DRAM_SIZE];
+        this->nRecords = Config::DRAM_SIZE / Config::RECORD_SIZE;
+    }
 
   public:
+    char *data;
+    int nRecords;
+
     static DRAM *getInstance() {
         if (instance == nullptr) {
             instance = new DRAM();
@@ -24,8 +29,10 @@ class DRAM {
         return instance;
     }
 
-    void readFrom(int address, char *data, int size);
-    void writeTo(int address, char *data, int size);
+    /**
+     * @brief Read records from file and store in DRAM
+     */
+    int generateRun(std::ifstream &file, int nRecords);
 };
 
 
@@ -37,16 +44,19 @@ class DRAM {
 class SSD {
   private:
     static SSD *instance;
-    char *data;
     SSD() { data = new char[Config::SSD_SIZE]; }
 
   public:
+    char *data;
     static SSD *getInstance() {
         if (instance == nullptr) {
             instance = new SSD();
         }
         return instance;
     }
+
+
+    int generateRun();
 
     // void read(int address, char *data, int size);
     // void write(int address, char *data, int size);
@@ -57,23 +67,22 @@ class SSD {
 // -------------------------- HDD --------------------------
 // =========================================================
 // Singleton HDD class
-
 class HDD {
   private:
-    static HDD *instance;
     char *data;
     HDD() { data = new char[Config::HDD_SIZE]; }
 
   public:
-    static HDD *getInstance() {
-        if (instance == nullptr) {
-            instance = new HDD();
-        }
+    // delete copy constructor and copy assignment operator to prevent copies
+    HDD(HDD const &) = delete;
+    void operator=(HDD const &) = delete;
+
+    static HDD &getInstance() {
+        static HDD instance;
         return instance;
     }
 
-    // void read(int address, char *data, int size);
-    // void write(int address, char *data, int size);
+    void externalSort();
 };
 
 #endif // _STORAGE_H_

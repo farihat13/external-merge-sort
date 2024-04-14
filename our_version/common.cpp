@@ -38,7 +38,7 @@ int Config::N_RECORDS_IN_DRAM_BUFFER;
 // ================================
 
 void printConfig() {
-    printv("== Configurations ==\n");
+    printv("\n== Configurations ==\n");
     // ---- Cache ----
     printv("\tCACHE_SIZE: %d bytes\n", Config::CACHE_SIZE);
     // ---- DRAM ----
@@ -68,7 +68,7 @@ void printConfig() {
     printv("\tN_RECORDS_IN_SSD: %d\n", Config::N_RECORDS_IN_SSD);
     printv("\tN_RECORDS_IN_DRAM_BUFFER: %d\n",
            Config::N_RECORDS_IN_DRAM_BUFFER);
-    printv("== End Configurations ==\n");
+    printv("== End Configurations ==\n\n");
 }
 
 void readConfig(const std::string &filename) {
@@ -148,6 +148,20 @@ void calcConfig() {
 
 
 // =========================================================
+// ------------------------- Record ------------------------
+// =========================================================
+
+
+std::string recordToString(char *data) {
+    std::string str = "";
+    for (int i = 0; i < Config::RECORD_SIZE; i++) {
+        str += data[i];
+    }
+    return str;
+}
+
+
+// =========================================================
 // ------------------------- Logger ------------------------
 // =========================================================
 
@@ -216,4 +230,14 @@ void printVerbose(bool vv, char const *const file, int const line,
 #endif
 
     va_end(args);
+}
+
+
+void flushVerbose() {
+#if defined(_USE_LOGFILE)
+    if (logFile.is_open())
+        logFile.flush();
+#else
+    std::fflush(stdout);
+#endif
 }

@@ -1,5 +1,5 @@
 # Compiler settings
-CPPOPT=-g -Og -D_DEBUG -D_USE_LOGFILE -D_SMALLCONFIG
+CPPOPT=-g -Og -D_DEBUG -D_SMALLCONFIG -D_USE_LOGFILE -D_SEED
 CXX = g++
 CXXFLAGS =$(CPPOPT) -Wall -std=c++11
 

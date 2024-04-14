@@ -83,6 +83,9 @@ void generateInputFile(const std::string &filename, int recordSize,
         exit(1);
     }
     srand(time(nullptr)); // Seed random number generator
+#if defined(_SEED)
+    srand(0);
+#endif
     char *record = new char[recordSize];
     for (int i = 0; i < numRecords; ++i) {
         gen_a_record(record, Config::RECORD_SIZE);
@@ -104,117 +107,32 @@ void generateInputFile(const std::string &filename, int recordSize,
 #endif
 }
 
-void quickSort(Record *records, int n) { // In-memory
-    printf("Sorting %d records\n", n);
-    if (n <= 1)
-        return;
-    Record pivot = records[n / 2];
-    Record *left = records;
-    Record *right = records + n - 1;
-    while (left <= right) {
-        if (*left < pivot) {
-            left++;
-            continue;
-        }
-        if (pivot < *right) {
-            right--;
-            continue;
-        }
-        std::swap(*left, *right);
-        left++;
-        right--;
-    }
-    quickSort(records, right - records + 1);
-    quickSort(left, records + n - left);
-}
-
-void externalSort(const std::string &inputFile, const std::string &outputFile,
-                  int recordSize) {
-    std::ifstream file(inputFile, std::ios::binary);
-    if (!file) {
-        std::cerr << "Error opening input file." << std::endl;
-        exit(1);
-    }
-
-    // Read records into memory and sort cache-size chunks
-    int n_cache_in_dram = Config::DRAM_SIZE / Config::CACHE_SIZE;
-    int n_records_in_cache = Config::CACHE_SIZE / Config::RECORD_SIZE;
-    printf("n_cache_in_dram: %d\n", n_cache_in_dram);
-    printf("n_records_in_cache: %d\n", n_records_in_cache);
-    printf("each record size: %lu bytes\n", sizeof(Record));
-    int i = 0;
-    Record *dram = new Record[n_cache_in_dram * n_records_in_cache];
-
-    std::ofstream cacheFile("cache.tmp", std::ios::binary);
-    while (true) {
-        if (!file.read(dram[i++].data, Config::RECORD_SIZE)) {
-            for (int j = 0; j < n_cache_in_dram; j++) {
-                if (j * n_records_in_cache >= i)
-                    break;
-                int len = i - j * n_records_in_cache;
-                len = std::min(len, n_records_in_cache);
-                if (j * (n_records_in_cache + 1) < i)
-                    quickSort(dram + j * n_records_in_cache, len);
-            }
-            for (i = 0; i < n_cache_in_dram * n_records_in_cache; i++) {
-                cacheFile.write(dram[i].data, Config::RECORD_SIZE);
-                cacheFile.write("\n", 1);
-            }
-            cacheFile.write("\n", 1);
-            printf("Sorted cache-size chunk\n");
-        }
-        printf("Read record %d\n", i);
-        if (i == n_cache_in_dram * n_records_in_cache) {
-            for (int j = 0; j < n_cache_in_dram; j++) {
-                quickSort(dram + j * n_records_in_cache, n_records_in_cache);
-                printf("Sorted record [%d, %d)\n", j * n_records_in_cache,
-                       (j + 1) * n_records_in_cache);
-            }
-            for (i = 0; i < n_cache_in_dram * n_records_in_cache; i++) {
-                cacheFile.write(dram[i].data, Config::RECORD_SIZE);
-                cacheFile.write("\n", 1);
-            }
-            cacheFile.write("\n", 1);
-            printf("Sorted cache-size chunk\n");
-            i = 0;
-        }
-    }
-    cacheFile.close();
-    file.close();
-    printf("Sorted cache-size chunks\n");
-
-    // // Write sorted records to output file
-    // std::ofstream outputFileStream(outputFile, std::ios::binary);
-    // if (!outputFileStream) {
-    //     std::cerr << "Error opening output file." << std::endl;
-    //     exit(1);
-    // }
-    // for (const auto &record : records) {
-    //     outputFileStream.write(reinterpret_cast<const char *>(&record.key),
-    //                            sizeof(record.key));
-    //     outputFileStream.write(record.data.data(), record.data.size());
-    // }
-
-    // outputFileStream.close();
-}
-
 
 /**
  * @brief Main function
  * ./externalsort -c 20 -s 1024 -o trace
  */
 int main(int argc, char *argv[]) {
+    // read command line arguments
     readCmdlineArgs(argc, argv);
+
+    // read config file
 #if defined(_SMALLCONFIG) && defined(_DEBUG)
     readConfig("config_small.txt");
 #endif
+
+    // calculate derived config values and print config
     calcConfig();
     printConfig();
 
+    // generate input file
     generateInputFile(Config::INPUT_FILE, Config::RECORD_SIZE,
                       Config::NUM_RECORDS);
-    // externalSort(Config::INPUT_FILE, Config::OUTPUT_FILE,
-    // Config::RECORD_SIZE);
+    flushv();
+
+    // sort the input file
+    HDD &hdd = HDD::getInstance();
+    hdd.externalSort();
 
     return 0;
 }

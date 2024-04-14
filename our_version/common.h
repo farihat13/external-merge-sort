@@ -68,15 +68,22 @@ void calcConfig();
 class Record {
   public:
     char *data;
-    Record() { data = new char[Config::RECORD_SIZE]; }
+    Record() {}
     Record(char *data) : data(data) {}
-    ~Record() { delete[] data; }
+    // ~Record() { delete[] data; }
     // default comparison based on first 8 bytes of data
     bool operator<(const Record &other) const {
         return std::strncmp(data, other.data, Config::RECORD_KEY_SIZE) < 0;
     }
+    // to string
+    std::string toString() const {
+        std::ostringstream oss;
+        oss << "Record(" << std::string(data, Config::RECORD_SIZE) << ")";
+        return oss.str();
+    }
 }; // class Record
 
+std::string recordToString(char *data);
 
 // =========================================================
 // ------------------------- Logger ------------------------
@@ -126,5 +133,9 @@ void printVerbose(bool vv, char const *const file, int const line,
     printVerbose(false, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
 #define printvv(...)                                                           \
     printVerbose(true, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+
+
+void flushVerbose();
+#define flushv() flushVerbose()
 
 #endif // _COMMON_H_
