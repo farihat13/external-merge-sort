@@ -94,9 +94,9 @@ void generateInputFile(const std::string &filename, int recordSize,
     file.close();
     readablefile.close();
     delete[] record;
-    printv("Generated %d records in file %s\n", numRecords, filename.c_str());
+    printvv("Generated %d records in file %s\n", numRecords, filename.c_str());
 
-#if defined(_DEBUG) || defined(DEBUG)
+#if defined(_DEBUG)
     std::ifstream inputfile(filename, std::ios::binary);
     inputfile.seekg(0, std::ios::end);
     DebugAssert(inputfile.tellg() == numRecords * recordSize);
@@ -106,26 +106,26 @@ void generateInputFile(const std::string &filename, int recordSize,
 
 void quickSort(Record *records, int n) { // In-memory
     printf("Sorting %d records\n", n);
-    // if (n <= 1)
-    //     return;
-    // Record pivot = records[n / 2];
-    // Record *left = records;
-    // Record *right = records + n - 1;
-    // while (left <= right) {
-    //     if (*left < pivot) {
-    //         left++;
-    //         continue;
-    //     }
-    //     if (pivot < *right) {
-    //         right--;
-    //         continue;
-    //     }
-    //     std::swap(*left, *right);
-    //     left++;
-    //     right--;
-    // }
-    // quickSort(records, right - records + 1);
-    // quickSort(left, records + n - left);
+    if (n <= 1)
+        return;
+    Record pivot = records[n / 2];
+    Record *left = records;
+    Record *right = records + n - 1;
+    while (left <= right) {
+        if (*left < pivot) {
+            left++;
+            continue;
+        }
+        if (pivot < *right) {
+            right--;
+            continue;
+        }
+        std::swap(*left, *right);
+        left++;
+        right--;
+    }
+    quickSort(records, right - records + 1);
+    quickSort(left, records + n - left);
 }
 
 void externalSort(const std::string &inputFile, const std::string &outputFile,
@@ -205,11 +205,16 @@ void externalSort(const std::string &inputFile, const std::string &outputFile,
  */
 int main(int argc, char *argv[]) {
     readCmdlineArgs(argc, argv);
+#if defined(_SMALLCONFIG) && defined(_DEBUG)
+    readConfig("config_small.txt");
+#endif
+    calcConfig();
     printConfig();
 
     generateInputFile(Config::INPUT_FILE, Config::RECORD_SIZE,
                       Config::NUM_RECORDS);
-    // externalSort(Config::INPUT_FILE, Config::OUTPUT_FILE, Config::RECORD_SIZE);
+    // externalSort(Config::INPUT_FILE, Config::OUTPUT_FILE,
+    // Config::RECORD_SIZE);
 
     return 0;
 }

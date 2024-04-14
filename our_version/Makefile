@@ -1,5 +1,5 @@
 # Compiler settings
-CPPOPT=-g -Og -D_DEBUG -D_USE_LOGFILE
+CPPOPT=-g -Og -D_DEBUG -D_USE_LOGFILE -D_SMALLCONFIG
 CXX = g++
 CXXFLAGS =$(CPPOPT) -Wall -std=c++11
 
@@ -31,4 +31,4 @@ clean:
 	rm -f $(OBJS) $(TARGET)
 
 cleanall:
-	rm -f $(OBJS) $(TARGET) input.txt log.txt readable_input.txt trace.txt
+	rm -f $(OBJS) $(TARGET) input.txt log.txt readable_input.txt trace.txt cache.tmp

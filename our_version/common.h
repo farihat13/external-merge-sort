@@ -11,6 +11,7 @@
 #include <ctime>
 #include <fstream>
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -23,28 +24,40 @@
 class Config {
   public:
     // variables
-    static constexpr int CACHE_SIZE = 1 * 1 * 1024;           // 1 KB
-    static constexpr int DRAM_SIZE = 1 * 10 * 1024;           // 100 MB
-    static constexpr double DRAM_LATENCY = 1.0 / (10 * 1000); // 0.1 ms
-    static constexpr int DRAM_BANDWIDTH = 100 * 1024 * 1024;  // 100 MB/s
-    static constexpr int DRAM_BUFFER_SIZE =
-        DRAM_BANDWIDTH * DRAM_LATENCY;                               // 10 MB
-    static constexpr long long SSD_SIZE = 10LL * 1024 * 1024 * 1024; // 10 GB
-    static constexpr double SSD_LATENCY = 1.0 / (10 * 1000);         // 0.1 ms
-    static constexpr int SSD_BANDWIDTH = 100 * 1024 * 1024;          // 100 MB/s
-    static constexpr int HDD_SIZE = INT_MAX;                         // Infinite
-    static constexpr double HDD_LATENCY = 1 * 10.0 / 1000;           // 10 ms
-    static constexpr int HDD_BANDWIDTH = 100 * 1024 * 1024;          // 100 MB/s
-    static constexpr int RECORD_KEY_SIZE = 8;                        // 8 bytes
-    static int RECORD_SIZE; // 1024 bytes
-    static int NUM_RECORDS; // 20 records
+
+    // ---- Cache ----
+    static int CACHE_SIZE; // 1 KB
+    // ---- DRAM ----
+    static int DRAM_SIZE;        // 100 MB
+    static double DRAM_LATENCY;  // 0.1 ms
+    static int DRAM_BANDWIDTH;   // 100 MB/s
+    static int DRAM_BUFFER_SIZE; // 10 MB
+    // ---- SSD ----
+    static long long SSD_SIZE; // 10 GB
+    static double SSD_LATENCY; // 0.1 ms
+    static int SSD_BANDWIDTH;  // 100 MB/s
+    // ---- HDD ----
+    static int HDD_SIZE;       // Infinite
+    static double HDD_LATENCY; // 10 ms
+    static int HDD_BANDWIDTH;  // 100 MB/s
+    // ---- Record ----
+    static int RECORD_KEY_SIZE; // 8 bytes
+    static int RECORD_SIZE;     // 1024 bytes
+    static int NUM_RECORDS;     // 20 records
+    // ---- File ----
     static std::string OUTPUT_FILE;
     static std::string INPUT_FILE;
     static std::string TRACE_FILE;
-
+    // ---- useful for sorting ----
+    static int N_RECORDS_IN_CACHE;
+    static int N_RECORDS_IN_DRAM;
+    static int N_RECORDS_IN_SSD;
+    static int N_RECORDS_IN_DRAM_BUFFER;
 }; // class Config
 
 void printConfig();
+void readConfig(const std::string &configFile);
+void calcConfig();
 
 
 // =========================================================
@@ -107,9 +120,11 @@ void Assert(bool const predicate, char const *const file, int const line,
 
 extern std::ofstream logFile;
 
-void printVerbose(char const *const file, int const line,
+void printVerbose(bool vv, char const *const file, int const line,
                   char const *const function, const char *format, ...);
-#define printv(...) printVerbose(__FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
-
+#define printv(...)                                                            \
+    printVerbose(false, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define printvv(...)                                                           \
+    printVerbose(true, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
 
 #endif // _COMMON_H_

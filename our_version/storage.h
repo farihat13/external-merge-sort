@@ -24,8 +24,8 @@ class DRAM {
         return instance;
     }
 
-    // void read(int address, char *data, int size);
-    // void write(int address, char *data, int size);
+    void readFrom(int address, char *data, int size);
+    void writeTo(int address, char *data, int size);
 };
 
 

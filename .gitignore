@@ -43,3 +43,4 @@ our_version/*input*
 our_version/trace*
 our_version/output*
 our_version/cache*
+our_version/log.txt
