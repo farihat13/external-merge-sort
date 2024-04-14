@@ -99,16 +99,13 @@ class Logger {
 void Assert(bool const predicate, char const *const file, int const line,
             char const *const function);
 
-#if defined(_DEBUG) || defined(DEBUG)
+#if defined(_DEBUG)
 #define DebugAssert(b) Assert((b), __FILE__, __LINE__, __FUNCTION__)
-#else // _DEBUG DEBUG
+#else // _DEBUG
 #define DebugAssert(b) (void)(0)
-#endif // _DEBUG DEBUG
+#endif // _DEBUG
 
-
-#ifdef USE_LOGFILE
-std::ofstream logFile("log.txt");
-#endif // USE_LOGFILE
+extern std::ofstream logFile;
 
 void printVerbose(char const *const file, int const line,
                   char const *const function, const char *format, ...);

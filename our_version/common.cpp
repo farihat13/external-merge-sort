@@ -13,9 +13,9 @@ std::string Config::TRACE_FILE = "trace";
 
 void printConfig() {
     std::cout << "== Configurations ==\n";
-    std::cout << "RECORD_SIZE: " << Config::RECORD_SIZE << std::endl;
-    std::cout << "NUM_RECORDS: " << Config::NUM_RECORDS << std::endl;
-    std::cout << "TRACE_FILE: " << Config::TRACE_FILE << std::endl;
+    std::cout << "\tRECORD_SIZE: " << Config::RECORD_SIZE << std::endl;
+    std::cout << "\tNUM_RECORDS: " << Config::NUM_RECORDS << std::endl;
+    std::cout << "\tTRACE_FILE: " << Config::TRACE_FILE << std::endl;
     std::cout << "== End Configurations ==\n";
 }
 
@@ -65,18 +65,21 @@ void Assert(bool const predicate, char const *const file, int const line,
 } // Assert
 
 
+std::ofstream logFile;
+
 void printVerbose(char const *const file, int const line,
                   char const *const function, const char *format, ...) {
     va_list args;
     va_start(args, format);
 
-#ifdef USE_LOGFILE
-    if (logFile.is_open()) {
-        logFile << file << ":" << line << ":" << function << " ";
-        char buffer[1024];
-        vsnprintf(buffer, sizeof(buffer), format, args);
-        logFile << buffer;
+#if defined(_USE_LOGFILE)
+    if (!logFile.is_open()) {
+        logFile.open("log.txt");
     }
+    logFile << file << ":" << line << ":" << function << " ";
+    char buffer[1024];
+    vsnprintf(buffer, sizeof(buffer), format, args);
+    logFile << buffer;
 #else
     std::printf("%s:%d:%s\t", file, line, function);
     std::vprintf(format, args);
