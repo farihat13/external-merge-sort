@@ -28,10 +28,9 @@ class Config {
     // ---- Cache ----
     static int CACHE_SIZE; // 1 KB
     // ---- DRAM ----
-    static int DRAM_SIZE;        // 100 MB
-    static double DRAM_LATENCY;  // 0.1 ms
-    static int DRAM_BANDWIDTH;   // 100 MB/s
-    static int DRAM_BUFFER_SIZE; // 10 MB
+    static int DRAM_SIZE;       // 100 MB
+    static double DRAM_LATENCY; // 0.1 ms
+    static int DRAM_BANDWIDTH;  // 100 MB/s
     // ---- SSD ----
     static long long SSD_SIZE; // 10 GB
     static double SSD_LATENCY; // 0.1 ms
@@ -48,17 +47,10 @@ class Config {
     static std::string OUTPUT_FILE;
     static std::string INPUT_FILE;
     static std::string TRACE_FILE;
-    // ---- useful for sorting ----
-    static int N_RECORDS_IN_CACHE;
-    static int N_RECORDS_IN_DRAM;
-    static int N_RECORDS_IN_SSD;
-    static int N_RECORDS_IN_DRAM_BUFFER;
 }; // class Config
 
 void printConfig();
 void readConfig(const std::string &configFile);
-void calcConfig();
-
 
 // =========================================================
 // ------------------------- Record ------------------------

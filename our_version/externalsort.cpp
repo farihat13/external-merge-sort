@@ -122,7 +122,6 @@ int main(int argc, char *argv[]) {
 #endif
 
     // calculate derived config values and print config
-    calcConfig();
     printConfig();
 
     // generate input file

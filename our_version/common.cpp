@@ -12,8 +12,6 @@ int Config::CACHE_SIZE = 1 * 1 * 1024;           // 1 KB
 int Config::DRAM_SIZE = 1 * 100 * 1024 * 1024;   // 100 MB
 double Config::DRAM_LATENCY = 1.0 / (10 * 1000); // 0.1 ms
 int Config::DRAM_BANDWIDTH = 100 * 1024 * 1024;  // 100 MB/s
-int Config::DRAM_BUFFER_SIZE = // TODO: check what should be the buffer size
-    Config::DRAM_BANDWIDTH * Config::DRAM_LATENCY; // 10 MB
 // ---- SSD ----
 long long Config::SSD_SIZE = 10LL * 1024 * 1024 * 1024; // 10 GB
 double Config::SSD_LATENCY = 1.0 / (10 * 1000);         // 0.1 ms
@@ -30,11 +28,6 @@ int Config::NUM_RECORDS = 20;    // 20 records
 std::string Config::OUTPUT_FILE = "output.txt";
 std::string Config::INPUT_FILE = "input.txt";
 std::string Config::TRACE_FILE = "trace.log";
-// ---- useful for sorting ----
-int Config::N_RECORDS_IN_CACHE;
-int Config::N_RECORDS_IN_DRAM;
-int Config::N_RECORDS_IN_SSD;
-int Config::N_RECORDS_IN_DRAM_BUFFER;
 // ================================
 
 void printConfig() {
@@ -45,7 +38,6 @@ void printConfig() {
     printv("\tDRAM_SIZE: %d bytes\n", Config::DRAM_SIZE);
     printv("\tDRAM_LATENCY: %f\n", Config::DRAM_LATENCY);
     printv("\tDRAM_BANDWIDTH: %d\n", Config::DRAM_BANDWIDTH);
-    printv("\tDRAM_BUFFER_SIZE: %d bytes\n", Config::DRAM_BUFFER_SIZE);
     // ---- SSD ----
     printv("\tSSD_SIZE: %lld bytes\n", Config::SSD_SIZE);
     printv("\tSSD_LATENCY: %f\n", Config::SSD_LATENCY);
@@ -62,12 +54,6 @@ void printConfig() {
     printv("\tOUTPUT_FILE: %s\n", Config::OUTPUT_FILE.c_str());
     printv("\tINPUT_FILE: %s\n", Config::INPUT_FILE.c_str());
     printv("\tTRACE_FILE: %s\n", Config::TRACE_FILE.c_str());
-    // ---- useful for sorting ----
-    printv("\tN_RECORDS_IN_CACHE: %d\n", Config::N_RECORDS_IN_CACHE);
-    printv("\tN_RECORDS_IN_DRAM: %d\n", Config::N_RECORDS_IN_DRAM);
-    printv("\tN_RECORDS_IN_SSD: %d\n", Config::N_RECORDS_IN_SSD);
-    printv("\tN_RECORDS_IN_DRAM_BUFFER: %d\n",
-           Config::N_RECORDS_IN_DRAM_BUFFER);
     printv("== End Configurations ==\n\n");
 }
 
@@ -92,8 +78,6 @@ void readConfig(const std::string &filename) {
                     Config::DRAM_LATENCY = stod(value);
                 else if (key == "DRAM_BANDWIDTH")
                     Config::DRAM_BANDWIDTH = stoi(value);
-                else if (key == "DRAM_BUFFER_SIZE")
-                    Config::DRAM_BUFFER_SIZE = stoi(value);
                 else if (key == "SSD_SIZE")
                     Config::SSD_SIZE = stoll(value);
                 else if (key == "SSD_LATENCY")
@@ -122,28 +106,6 @@ void readConfig(const std::string &filename) {
         }
     }
     configFile.close();
-}
-
-void calcConfig() {
-    // ---- useful for sorting ----
-    Config::N_RECORDS_IN_CACHE = Config::CACHE_SIZE / Config::RECORD_SIZE;
-    Config::N_RECORDS_IN_DRAM = Config::DRAM_SIZE / Config::RECORD_SIZE;
-    Config::N_RECORDS_IN_SSD = Config::SSD_SIZE / Config::RECORD_SIZE;
-    if (Config::N_RECORDS_IN_CACHE == 0 || Config::N_RECORDS_IN_DRAM == 0 ||
-        Config::N_RECORDS_IN_SSD == 0) {
-        printv("Error: Record size is too large\n");
-        exit(1);
-    }
-    Config::DRAM_BUFFER_SIZE = Config::DRAM_BANDWIDTH * Config::DRAM_LATENCY;
-    if (Config::DRAM_BUFFER_SIZE > Config::DRAM_SIZE) {
-        int n = Config::DRAM_SIZE /
-                (Config::N_RECORDS_IN_CACHE * Config::RECORD_SIZE);
-        Config::DRAM_BUFFER_SIZE =
-            Config::DRAM_SIZE -
-            (n - 1) * (Config::N_RECORDS_IN_CACHE * Config::RECORD_SIZE);
-    }
-    Config::N_RECORDS_IN_DRAM_BUFFER =
-        Config::DRAM_BUFFER_SIZE / Config::RECORD_SIZE;
 }
 
 
