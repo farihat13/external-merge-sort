@@ -40,9 +40,9 @@ class Config {
     static double HDD_LATENCY; // 10 ms
     static int HDD_BANDWIDTH;  // 100 MB/s
     // ---- Record ----
-    static int RECORD_KEY_SIZE; // 8 bytes
-    static int RECORD_SIZE;     // 1024 bytes
-    static int NUM_RECORDS;     // 20 records
+    static int RECORD_KEY_SIZE;   // 8 bytes
+    static int RECORD_SIZE;       // 1024 bytes
+    static long long NUM_RECORDS; // 20 records
     // ---- File ----
     static std::string OUTPUT_FILE;
     static std::string INPUT_FILE;
@@ -51,6 +51,9 @@ class Config {
 
 void printConfig();
 void readConfig(const std::string &configFile);
+long long getInputSizeInBytes();
+long long getInputSizeInGB();
+std::string formatNum(long long num);
 
 // =========================================================
 // ------------------------- Record ------------------------

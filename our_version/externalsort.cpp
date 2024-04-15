@@ -124,6 +124,12 @@ int main(int argc, char *argv[]) {
     // calculate derived config values and print config
     printConfig();
 
+    if (getInputSizeInGB() >= 0.5) { // TODO: remove this
+        fprintf(stderr, "Error: Number of records * record size > SSD size\n");
+        HDD::getInstance().externalSortPlan();
+        flushv();
+        exit(1);
+    }
     // generate input file
     generateInputFile(Config::INPUT_FILE, Config::RECORD_SIZE,
                       Config::NUM_RECORDS);
@@ -132,6 +138,7 @@ int main(int argc, char *argv[]) {
     // sort the input file
     HDD &hdd = HDD::getInstance();
     hdd.externalSort();
+    flushv();
 
     return 0;
 }

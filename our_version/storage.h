@@ -13,12 +13,13 @@
 class DRAM {
   private:
     // ---- configurations ----
-    int maxNumRecords;
+    long long maxNumRecords;
     int bufferSizeInBytes;
+    int numWays = 16;
 
     // ---- current state ----
     char *data;
-    int nRecords = 0;
+    long long nRecords = 0;
 
     // ---- singleton instance ----
     static DRAM *instance;
@@ -63,15 +64,16 @@ class DRAM {
 class SSD {
   private:
     // ---- configurations ----
-    int maxNumRecords;
+    long long maxNumRecords;
     int bufferSizeInBytes;
     int maxNumRuns;
-
+    int numWays = 16;
+    const std::string filename = "ssd.tmp";
 
     // ---- current state ----
-    char *data;
-    int nRecords = 0;
+    long long nRecords = 0;
     int nRuns = 0;
+    long long nRecordsPerRun = 0;
 
     // ---- singleton instance ----
     static SSD *instance;
@@ -86,9 +88,10 @@ class SSD {
                            (maxNumRecordsPerRun * Config::RECORD_SIZE);
 
         // ---- current state ----
-        this->data = new char[Config::SSD_SIZE];
-        this->nRecords = 0;
-        this->nRuns = 0;
+        std::ofstream file(this->filename, std::ios::binary);
+        file.write("", 1);
+        file.close();
+        this->reset();
 
         printv("\nSSD: max %d records, Buffer size %d bytes,"
                "\n\tMax #records per DRAM_size_run % d"
@@ -108,16 +111,27 @@ class SSD {
     int getMaxNumRecords() { return maxNumRecords; }
     int getMaxNumRuns() { return maxNumRuns; }
 
+    void printState() {
+        printv("SSD: %d records, %d runs, %d recordsPerRun\n", nRecords, nRuns,
+               nRecordsPerRun);
+    }
+
     void reset() {
         this->nRecords = 0;
         this->nRuns = 0;
+        this->nRecordsPerRun = 0;
         printv("SSD: Reset\n");
     }
+
+    int read(int address, char *buffer, int nBytes);
+    int write(int address, char *buffer, int nBytes);
 
     /**
      * @brief copy records from DRAM to SSD
      */
     int storeRun();
+    int mergeRuns();
+    void mergeRunsPlan();
 
     // void read(int address, char *data, int size);
     // void write(int address, char *data, int size);
@@ -132,12 +146,19 @@ class SSD {
 // Singleton HDD class
 class HDD {
   private:
+    // ---- configurations ----
+    const std::string filename = "hdd.tmp";
     // ---- current state ----
-    int nRecords = 0;
+    long long nRecords = 0;
+    int nRuns = 0;
+    long long nRecordsPerRun = 0;
 
 
     HDD() {
-        this->nRecords = 0;
+        std::ofstream file(this->filename, std::ios::binary);
+        file.write("", 1);
+        file.close();
+        this->reset();
         printv("\nHDD: Infinite size\n----\n");
     }
 
@@ -151,7 +172,28 @@ class HDD {
         return instance;
     }
 
+    void printState() {
+        printv("HDD State: %d records, %d runs, %d recordsPerRun\n", nRecords,
+               nRuns, nRecordsPerRun);
+    }
+
+    void reset() {
+        this->nRecords = 0;
+        this->nRuns = 0;
+        this->nRecordsPerRun = 0;
+        printv("HDD: Reset\n");
+    }
+
+    int read(int address, char *buffer, int nBytes);
+    int write(int address, char *buffer, int nBytes);
+
+    /**
+     * @brief copy records from SSD to HDD
+     */
+    int storeRun();
+    int mergeRuns();
     void externalSort();
+    void externalSortPlan();
 };
 
 #endif // _STORAGE_H_

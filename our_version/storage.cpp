@@ -2,6 +2,30 @@
 #include <algorithm>
 #include <vector>
 
+
+// =========================================================
+// ----------------------- Common Utils --------------------
+// =========================================================
+
+int readFile(std::string filename, int address, char *buffer, int nBytes) {
+    std::ifstream file(filename, std::ios::binary);
+    file.seekg(address, std::ios::beg);
+    file.read(buffer, nBytes);
+    file.close();
+    // printvv("\tRead %d bytes from SSD\n", nBytes);
+    return nBytes;
+}
+
+int writeFile(std::string filename, int address, char *buffer, int nBytes) {
+    std::ofstream file(filename, std::ios::binary);
+    file.seekp(address, std::ios::beg);
+    file.write(buffer, nBytes);
+    file.close();
+    // printvv("\tWrote %d bytes to SSD\n", nBytes);
+    return nBytes;
+}
+
+
 // =========================================================
 // -------------------- In-memory Quick Sort ---------------
 // =========================================================
@@ -73,8 +97,8 @@ int DRAM::generateRun(std::ifstream &file, int nRecords) {
     }
     quickSort(records, nRecords);
 
-    printv("\tRead %d records (%d bytes) From Disk to DRAM and Sorted those\n",
-           nRecords, nBytesRead);
+    printvv("\tRead %d records (%d bytes) From Disk to DRAM and Sorted those\n",
+            nRecords, nBytesRead);
 
 #if defined(_DEBUG)
     // for (int i = 0; i < nRecords; i++) {
@@ -94,6 +118,26 @@ int DRAM::generateRun(std::ifstream &file, int nRecords) {
 
 SSD *SSD::instance = nullptr;
 
+int SSD::read(int address, char *buffer, int nBytes) {
+    if (address + nBytes > this->maxNumRecords * Config::RECORD_SIZE) {
+        fprintf(stderr, "Error: SSD read exceeds SSD capacity\n");
+        return -1;
+    }
+    readFile(this->filename, address, buffer, nBytes);
+    // printvv("\tRead %d bytes from SSD\n", nBytes);
+    return nBytes;
+}
+
+int SSD::write(int address, char *buffer, int nBytes) {
+    if (address + nBytes > this->maxNumRecords * Config::RECORD_SIZE) {
+        fprintf(stderr, "Error: SSD write exceeds SSD capacity\n");
+        return -1;
+    }
+    writeFile(this->filename, address, buffer, nBytes);
+    // printvv("\tWrote %d bytes to SSD\n", nBytes);
+    return nBytes;
+}
+
 int SSD::storeRun() {
     if (this->nRuns >= this->maxNumRuns) {
         fprintf(stderr, "Error: SSD is storing %d out of %d runs already\n",
@@ -101,19 +145,66 @@ int SSD::storeRun() {
         return -1;
     }
     DRAM *dram = DRAM::getInstance();
-    if (dram->nRecords > this->maxNumRecords ||
-        dram->nRecords > this->maxNumRecords - this->nRecords) {
-        fprintf(stderr, "Error: SSD capacity exceeded\n");
-        return -1;
-    }
     // copy the records from DRAM to SSD
-    memcpy(this->data + this->nRecords * Config::RECORD_SIZE, dram->data,
-           dram->nRecords * Config::RECORD_SIZE);
+    this->write(this->nRecords * Config::RECORD_SIZE, dram->data,
+                dram->nRecords * Config::RECORD_SIZE);
     this->nRecords += dram->nRecords;
     this->nRuns++;
-    printv("\tCopied %d records (%d bytes) from DRAM to SSD\n", dram->nRecords,
-           dram->nRecords * Config::RECORD_SIZE);
+#if defined(_DEBUG)
+    printvv("\tCopied %d records (%d bytes) from DRAM to SSD\n", dram->nRecords,
+            dram->nRecords * Config::RECORD_SIZE);
+    this->printState();
+#endif
     return dram->nRecords;
+}
+
+int SSD::mergeRuns() {
+    printv("STATE -> Merge the runs in SSD and store %d records in HDD\n",
+           Config::NUM_RECORDS);
+    // read the runs from SSD
+    int nRuns = this->nRuns;
+    int nRecords = this->nRecords;
+    Record *records = new Record[nRecords];
+    for (int i = 0; i < nRuns; i++) {
+        this->read(i * Config::RECORD_SIZE, records[i].data,
+                   Config::RECORD_SIZE);
+    }
+
+    // merge the runs
+    std::vector<int> indexes(nRuns, 0);
+    Record *output = new Record[nRecords];
+    for (int i = 0; i < nRecords; i++) {
+        int minIndex = -1;
+        for (int j = 0; j < nRuns; j++) {
+            if (indexes[j] < Config::RECORD_SIZE) {
+                if (minIndex == -1) {
+                    minIndex = j;
+                } else if (records[j] < records[minIndex]) {
+                    minIndex = j;
+                }
+            }
+        }
+        output[i] = records[minIndex];
+        indexes[minIndex]++;
+    }
+
+    // write the merged runs to SSD
+    for (int i = 0; i < nRecords; i++) {
+        this->write(i * Config::RECORD_SIZE, output[i].data,
+                    Config::RECORD_SIZE);
+    }
+    this->nRecords = nRecords;
+    this->nRuns = 1;
+    printv("\tMerged %d runs and stored %d records (%d bytes) in SSD\n", nRuns,
+           nRecords, nRecords * Config::RECORD_SIZE);
+    this->printState();
+    return nRecords;
+}
+
+void SSD::mergeRunsPlan() {
+    printv("STATE -> Merge the runs in SSD and store %d records in HDD\n",
+           Config::NUM_RECORDS);
+    // read the runs from SSD to memory
 }
 
 
@@ -121,10 +212,23 @@ int SSD::storeRun() {
 // -------------------------- HDD --------------------------
 // ---------------------------------------------------------
 
+// HDD *HDD::instance = nullptr;
+
+
+int HDD::read(int address, char *buffer, int nBytes) {
+    readFile(this->filename, address, buffer, nBytes);
+    return nBytes;
+}
+
+int HDD::write(int address, char *buffer, int nBytes) {
+    writeFile(this->filename, address, buffer, nBytes);
+    return nBytes;
+}
+
 void HDD::externalSort() {
 
-    std::ifstream file(Config::INPUT_FILE, std::ios::binary);
-    if (!file) {
+    std::ifstream input(Config::INPUT_FILE, std::ios::binary);
+    if (!input) {
         std::cerr << "Error opening input file." << std::endl;
         exit(1);
     }
@@ -138,7 +242,7 @@ void HDD::externalSort() {
     int nRecordsReadFromHDD = 0;
     while (nRecordsReadFromHDD < Config::NUM_RECORDS) {
         // generate a DRAM_size_run
-        int nRecords = dram->generateRun(file, nRecordsInDRAM);
+        int nRecords = dram->generateRun(input, nRecordsInDRAM);
         nRecordsReadFromHDD += nRecords;
         flushv();
 
@@ -159,10 +263,73 @@ void HDD::externalSort() {
                    "HDD\n",
                    ssd->nRecords, ssd->nRecords * Config::RECORD_SIZE);
             // TODO: merge the runs in SSD
+            ssd->mergeRuns();
             this->nRecords += ssd->nRecords;
+            this->nRuns++;
             ssd->reset();
-            printv("HDD contains %d records (%d bytes)\n", this->nRecords,
-                   this->nRecords * Config::RECORD_SIZE);
+            this->printState();
+            goto end;
         }
+    }
+    this->reset();
+
+end:
+    input.close();
+}
+
+
+void HDD::externalSortPlan() {
+
+    SSD *ssd = SSD::getInstance();
+    DRAM *dram = DRAM::getInstance();
+
+    printv("\nExternal Sort Plan:\n");
+    printv("Input size: %s bytes (%s records)\n",
+           formatNum(getInputSizeInBytes()).c_str(),
+           formatNum(Config::NUM_RECORDS).c_str());
+
+    for (int i = 0; i < 1; i++) {
+        printv("\nIteration %d:\n", i + 1);
+        long long nRecordsReadFromHDD = 0;
+        // generate DRAM size runs
+        while (nRecordsReadFromHDD < Config::NUM_RECORDS) {
+
+            // generate a DRAM_size_run
+            dram->nRecords = std::min(
+                dram->maxNumRecords, Config::NUM_RECORDS - nRecordsReadFromHDD);
+            printv("\tACCESS -> read from HDD to DRAM: %s bytes (%d records)\n",
+                   formatNum(dram->maxNumRecords * Config::RECORD_SIZE).c_str(),
+                   dram->maxNumRecords);
+            printv("\tSTATE -> Quick Sort in DRAM\n");
+            flushv();
+            nRecordsReadFromHDD += dram->nRecords;
+
+            // store the run in SSD
+            printv(
+                "\tACCESS -> write from DRAM to SSD: %s bytes (%d records)\n",
+                formatNum(dram->nRecords * Config::RECORD_SIZE).c_str(),
+                dram->nRecords);
+            ssd->nRecords += dram->nRecords;
+            ssd->nRuns += 1;
+            ssd->nRecordsPerRun = std::max(dram->nRecords, ssd->nRecordsPerRun);
+            ssd->printState();
+
+            if (ssd->nRuns == ssd->maxNumRuns) {
+                // sort the runs in SSD
+                // printv("Merge the runs in SSD and store %d records in HDD\n",
+                //        Config::NUM_RECORDS);
+                ssd->mergeRunsPlan();
+            }
+
+            // sort the runs in SSD
+            printv("Merge the runs in SSD and store %d records in HDD\n",
+                   Config::NUM_RECORDS);
+        }
+        // TODO:
+        // this->nRecords += ssd->nRecords;
+        // this->nRuns++;
+        // this->nRecordsPerRun = ssd->nRecords;
+        // ssd->reset();
+        this->printState();
     }
 }

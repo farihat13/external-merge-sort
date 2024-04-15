@@ -7,23 +7,25 @@
 
 // ==== Default Configurations ====
 // ---- Cache ----
-int Config::CACHE_SIZE = 1 * 1 * 1024;           // 1 KB
-                                                 // ---- DRAM ----
-int Config::DRAM_SIZE = 1 * 100 * 1024 * 1024;   // 100 MB
-double Config::DRAM_LATENCY = 1.0 / (10 * 1000); // 0.1 ms
-int Config::DRAM_BANDWIDTH = 100 * 1024 * 1024;  // 100 MB/s
+int Config::CACHE_SIZE = 1 * 1 * 1024; // 1 KB
+// ---- DRAM ----
+int Config::DRAM_SIZE = 1 * 100 * 1024 * 1024;     // 100 MB
+double Config::DRAM_LATENCY = 1.0 / (1000 * 1000); // 10 microsecond
+int Config::DRAM_BANDWIDTH = 100 * 1024 * 1024;    // 100 GB/s
+// DRAM buffer size = 1 MB
 // ---- SSD ----
 long long Config::SSD_SIZE = 10LL * 1024 * 1024 * 1024; // 10 GB
 double Config::SSD_LATENCY = 1.0 / (10 * 1000);         // 0.1 ms
 int Config::SSD_BANDWIDTH = 100 * 1024 * 1024;          // 100 MB/s
+// SSD buffer size = 10 MB
 // ---- HDD ----
 int Config::HDD_SIZE = INT_MAX;                // Infinite
 double Config::HDD_LATENCY = 1 * 10.0 / 1000;  // 10 ms
 int Config::HDD_BANDWIDTH = 100 * 1024 * 1024; // 100 MB/s
 // ---- Record ----
-int Config::RECORD_KEY_SIZE = 8; // 8 bytes
-int Config::RECORD_SIZE = 1024;  // 1024 bytes
-int Config::NUM_RECORDS = 20;    // 20 records
+int Config::RECORD_KEY_SIZE = 8;      // 8 bytes
+int Config::RECORD_SIZE = 1024;       // 1024 bytes
+long long Config::NUM_RECORDS = 20LL; // 20 records
 // ---- File ----
 std::string Config::OUTPUT_FILE = "output.txt";
 std::string Config::INPUT_FILE = "input.txt";
@@ -49,7 +51,9 @@ void printConfig() {
     // ---- Record ----
     printv("\tRECORD_KEY_SIZE: %d bytes\n", Config::RECORD_KEY_SIZE);
     printv("\tRECORD_SIZE: %d bytes\n", Config::RECORD_SIZE);
-    printv("\tNUM_RECORDS: %d\n", Config::NUM_RECORDS);
+    printv("\tNUM_RECORDS: %lld (%s)\n", Config::NUM_RECORDS,
+           formatNum(Config::NUM_RECORDS).c_str());
+    printv("\tInput Size: %sBytes\n", formatNum(getInputSizeInBytes()).c_str());
     // ---- File ----
     printv("\tOUTPUT_FILE: %s\n", Config::OUTPUT_FILE.c_str());
     printv("\tINPUT_FILE: %s\n", Config::INPUT_FILE.c_str());
@@ -95,7 +99,7 @@ void readConfig(const std::string &filename) {
                 else if (key == "RECORD_SIZE")
                     Config::RECORD_SIZE = stoi(value);
                 else if (key == "NUM_RECORDS")
-                    Config::NUM_RECORDS = stoi(value);
+                    Config::NUM_RECORDS = stoll(value);
                 else if (key == "OUTPUT_FILE")
                     Config::OUTPUT_FILE = value;
                 else if (key == "INPUT_FILE")
@@ -106,6 +110,51 @@ void readConfig(const std::string &filename) {
         }
     }
     configFile.close();
+}
+
+long long getInputSizeInBytes() {
+    return Config::NUM_RECORDS * Config::RECORD_SIZE;
+}
+
+long long getInputSizeInGB() {
+    return getInputSizeInBytes() / (1024 * 1024 * 1024);
+}
+
+std::string formatNum(long long number) {
+    bool isNegative = number < 0;
+    if (isNegative)
+        number = -number;
+
+    std::string suffix = "";
+    double displayNumber = number;
+
+    if (number >= 1000000) {
+        displayNumber = number / 1000000.0;
+        suffix = " M";
+    } else if (number >= 1000) {
+        displayNumber = number / 1000.0;
+        suffix = " K";
+    }
+
+    // Convert the number to a formatted string with one decimal place
+    std::ostringstream stream;
+    stream << std::fixed << std::setprecision(1) << displayNumber;
+    std::string result = stream.str();
+
+    // Remove trailing zeros and possibly the decimal point
+    size_t dotPos = result.find('.');
+    if (dotPos != std::string::npos) {
+        // Remove trailing zeros
+        while (result.back() == '0') {
+            result.pop_back();
+        }
+        // If the last character is the dot, remove it
+        if (result.back() == '.') {
+            result.pop_back();
+        }
+    }
+
+    return (isNegative ? "-" : "") + result + suffix;
 }
 
 
