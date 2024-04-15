@@ -4,6 +4,42 @@
 
 
 // =========================================================
+// -------------------------- Page -------------------------
+// =========================================================
+
+int Page::put(int address, std::vector<Record> &v) {
+    if (address + v.size() > this->sizeInRecords()) {
+        fprintf(stderr, "Error: Page put address exceeds page size\n");
+        return -1;
+    }
+    std::copy(v.begin(), v.end(), this->records.begin() + address);
+    return 0;
+}
+
+// =========================================================
+// -------------------------- Storage ----------------------
+// =========================================================
+
+
+void Storage::configure() {
+    // TODO: configure MERGE_FAN_IN and MERGE_FAN_OUT
+
+    // calculate the page size in records
+    int nBytes = this->BANDWIDTH * this->LATENCY;
+    nBytes = ROUNDUP_4K(nBytes);
+    this->PAGE_SIZE_IN_RECORDS = std::ceil(nBytes / Config::RECORD_SIZE);
+
+    // calculate the cluster size in pages
+    int nRecords = this->CAPACITY_IN_BYTES / Config::RECORD_SIZE;
+    int nPages = nRecords / this->PAGE_SIZE_IN_RECORDS;
+    this->CLUSTER_SIZE = nPages / (this->MERGE_FAN_IN + this->MERGE_FAN_OUT);
+
+    printv("Configured %s: Page Size: %d records, Cluster Size: %d pages\n",
+           this->name.c_str(), this->PAGE_SIZE_IN_RECORDS, this->CLUSTER_SIZE);
+}
+
+
+// =========================================================
 // ----------------------- Common Utils --------------------
 // =========================================================
 
@@ -212,8 +248,7 @@ void SSD::mergeRunsPlan() {
 // -------------------------- HDD --------------------------
 // ---------------------------------------------------------
 
-// HDD *HDD::instance = nullptr;
-
+HDD *HDD::instance = nullptr;
 
 int HDD::read(int address, char *buffer, int nBytes) {
     readFile(this->filename, address, buffer, nBytes);
@@ -225,111 +260,119 @@ int HDD::write(int address, char *buffer, int nBytes) {
     return nBytes;
 }
 
-void HDD::externalSort() {
-
-    std::ifstream input(Config::INPUT_FILE, std::ios::binary);
-    if (!input) {
-        std::cerr << "Error opening input file." << std::endl;
-        exit(1);
-    }
-
-    SSD *ssd = SSD::getInstance();
-
-    // Read records into memory and sort cache-size chunks
-    DRAM *dram = DRAM::getInstance();
-    // generate DRAM size runs
-    const int nRecordsInDRAM = Config::DRAM_SIZE / Config::RECORD_SIZE;
-    int nRecordsReadFromHDD = 0;
-    while (nRecordsReadFromHDD < Config::NUM_RECORDS) {
-        // generate a DRAM_size_run
-        int nRecords = dram->generateRun(input, nRecordsInDRAM);
-        nRecordsReadFromHDD += nRecords;
-        flushv();
-
-        // store the run in SSD
-        int nRecordsStoredInSSD = ssd->storeRun();
-        if (nRecordsStoredInSSD == -1) {
-            fprintf(stderr, "Error: SSD is full\n");
-            exit(1);
+int HDD::readPage(std::ifstream &file, Page &page) {
+    int i = 0;
+    while (i < page.sizeInRecords()) {
+        file.read(page.records[i].data, Config::RECORD_SIZE);
+        if (file.eof()) {
+            break;
         }
-        if (nRecordsStoredInSSD == 0) {
-            fprintf(stderr, "Error: No records stored in SSD\n");
-            exit(1);
-        }
-
-        if (ssd->nRuns == ssd->maxNumRuns) {
-            // sort the runs in SSD
-            printv("Merge the runs in SSD and store %d records (%d bytes) in "
-                   "HDD\n",
-                   ssd->nRecords, ssd->nRecords * Config::RECORD_SIZE);
-            // TODO: merge the runs in SSD
-            ssd->mergeRuns();
-            this->nRecords += ssd->nRecords;
-            this->nRuns++;
-            ssd->reset();
-            this->printState();
-            goto end;
+        i++;
+        if (i < page.sizeInRecords()) {
+            page.records[i].invalidate();
         }
     }
-    this->reset();
-
-end:
-    input.close();
+    return i;
 }
 
+int HDD::firstPass(int runSize) {
+    std::ifstream file(Config::INPUT_FILE, std::ios::binary);
 
-void HDD::externalSortPlan() {
 
+    int nRecordsReadFromHDD = 0;
+    while (nRecordsReadFromHDD < Config::NUM_RECORDS) {
+        Page hddpage(this->PAGE_SIZE_IN_RECORDS);
+        int nRecords = readPage(file, hddpage);
+        nRecordsReadFromHDD += nRecords;
+    }
+    file.close();
+    return runSize;
+}
+
+// ---------------------------------------------------------
+// --------------------- External Sort ---------------------
+// ---------------------------------------------------------
+
+// void externalSort() {
+
+//     std::ifstream input(Config::INPUT_FILE, std::ios::binary);
+//     if (!input) {
+//         std::cerr << "Error opening input file." << std::endl;
+//         exit(1);
+//     }
+
+//     SSD *ssd = SSD::getInstance();
+
+//     // Read records into memory and sort cache-size chunks
+//     DRAM *dram = DRAM::getInstance();
+//     // generate DRAM size runs
+//     const int nRecordsInDRAM = Config::DRAM_SIZE / Config::RECORD_SIZE;
+//     int nRecordsReadFromHDD = 0;
+//     while (nRecordsReadFromHDD < Config::NUM_RECORDS) {
+//         // generate a DRAM_size_run
+//         int nRecords = dram->generateRun(input, nRecordsInDRAM);
+//         nRecordsReadFromHDD += nRecords;
+//         flushv();
+
+//         // store the run in SSD
+//         int nRecordsStoredInSSD = ssd->storeRun();
+//         if (nRecordsStoredInSSD == -1) {
+//             fprintf(stderr, "Error: SSD is full\n");
+//             exit(1);
+//         }
+//         if (nRecordsStoredInSSD == 0) {
+//             fprintf(stderr, "Error: No records stored in SSD\n");
+//             exit(1);
+//         }
+
+//         // if (ssd->nRuns == ssd->maxNumRuns) {
+//         //     // sort the runs in SSD
+//         //     printv("Merge the runs in SSD and store %d records (%d bytes)
+//         in
+//         //     "
+//         //            "HDD\n",
+//         //            ssd->nRecords, ssd->nRecords * Config::RECORD_SIZE);
+//         //     // TODO: merge the runs in SSD
+//         //     ssd->mergeRuns();
+//         //     this->nRecords += ssd->nRecords;
+//         //     this->nRuns++;
+//         //     ssd->reset();
+//         //     this->printState();
+//         //     goto end;
+//         // }
+//     }
+//     // this->reset();
+
+// end:
+//     input.close();
+// }
+
+
+void externalSort() {
+
+    HDD *hdd = HDD::getInstance();
     SSD *ssd = SSD::getInstance();
     DRAM *dram = DRAM::getInstance();
 
     printv("\nExternal Sort Plan:\n");
-    printv("Input size: %s bytes (%s records)\n",
+    printv("Input size: %sbytes (%s records)\n",
            formatNum(getInputSizeInBytes()).c_str(),
            formatNum(Config::NUM_RECORDS).c_str());
 
-    for (int i = 0; i < 1; i++) {
-        printv("\nIteration %d:\n", i + 1);
-        long long nRecordsReadFromHDD = 0;
-        // generate DRAM size runs
-        while (nRecordsReadFromHDD < Config::NUM_RECORDS) {
 
-            // generate a DRAM_size_run
-            dram->nRecords = std::min(
-                dram->maxNumRecords, Config::NUM_RECORDS - nRecordsReadFromHDD);
-            printv("\tACCESS -> read from HDD to DRAM: %s bytes (%d records)\n",
-                   formatNum(dram->maxNumRecords * Config::RECORD_SIZE).c_str(),
-                   dram->maxNumRecords);
-            printv("\tSTATE -> Quick Sort in DRAM\n");
-            flushv();
-            nRecordsReadFromHDD += dram->nRecords;
+    int SSD_SIZE_RUNS = ssd->MERGE_FAN_IN * ssd->CLUSTER_SIZE;
+    printv("\nStep 1: First PASS: generate SSD_SIZE_RUNS: %sBytes\n",
+           formatNum(SSD_SIZE_RUNS * Config::RECORD_SIZE).c_str());
+    hdd->firstPass(SSD_SIZE_RUNS);
 
-            // store the run in SSD
-            printv(
-                "\tACCESS -> write from DRAM to SSD: %s bytes (%d records)\n",
-                formatNum(dram->nRecords * Config::RECORD_SIZE).c_str(),
-                dram->nRecords);
-            ssd->nRecords += dram->nRecords;
-            ssd->nRuns += 1;
-            ssd->nRecordsPerRun = std::max(dram->nRecords, ssd->nRecordsPerRun);
-            ssd->printState();
-
-            if (ssd->nRuns == ssd->maxNumRuns) {
-                // sort the runs in SSD
-                // printv("Merge the runs in SSD and store %d records in HDD\n",
-                //        Config::NUM_RECORDS);
-                ssd->mergeRunsPlan();
-            }
-
-            // sort the runs in SSD
-            printv("Merge the runs in SSD and store %d records in HDD\n",
-                   Config::NUM_RECORDS);
-        }
-        // TODO:
-        // this->nRecords += ssd->nRecords;
-        // this->nRuns++;
-        // this->nRecordsPerRun = ssd->nRecords;
-        // ssd->reset();
-        this->printState();
+    int pass = 1;
+    for (int runSize = SSD_SIZE_RUNS; runSize < Config::NUM_RECORDS;
+         runSize *= hdd->MERGE_FAN_IN) {
+        printv("\nMERGE PASS %d\n", pass);
+        printv("Step: \tMerge %d runs of size %d records from HDD\n",
+               hdd->MERGE_FAN_IN, runSize);
+        printv("\t\tGenerate %d runs of size %d records in HDD\n",
+               hdd->MERGE_FAN_IN, runSize);
+        pass++;
     }
 }

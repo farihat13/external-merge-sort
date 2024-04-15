@@ -1,5 +1,5 @@
 # Compiler settings
-CPPOPT=-g -Og -D_DEBUG -D_USE_LOGFILE -D_SEED -D_SMALLCONFIG
+CPPOPT=-g -Og -D_DEBUG -D_USE_LOGFILE -D_SEED #-D_SMALLCONFIG
 CXX = g++
 CXXFLAGS =$(CPPOPT) -Wall -std=c++11
 
@@ -26,7 +26,7 @@ externalsort.o: externalsort.cpp storage.h common.h
 run: $(TARGET)
 	./$(TARGET) -c 1024 -s 200 -o trace
 runbig: $(TARGET)
-	./$(TARGET) -c 1048576 -s 1024 -o trace
+	./$(TARGET) -c 1048576 -s 2048 -o trace
 
 # Clean rule
 clean:

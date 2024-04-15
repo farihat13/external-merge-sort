@@ -3,6 +3,71 @@
 
 
 #include "common.h"
+#include <algorithm>
+#include <vector>
+
+// =========================================================
+// ------------------------- Page --------------------------
+// =========================================================
+
+class Page {
+  public:
+    std::vector<Record> records;
+
+    Page(int size) {
+        records.resize(size);
+        for (int i = 0; i < size; i++) {
+            records[i].data = new char[Config::RECORD_SIZE];
+        }
+    }
+    ~Page() {
+        for (int i = 0; i < records.size(); i++) {
+            delete[] records[i].data;
+        }
+    }
+    int sizeInRecords() { return records.size(); }
+    int put(int address, std::vector<Record> &v);
+};
+
+// =========================================================
+//  -------------------------- Storage ---------------------
+// =========================================================
+
+class Storage {
+  public:
+    std::string name;
+    // ---- configurations ----
+    int BANDWIDTH = 0;               // in MB/s
+    double LATENCY = 0;              // in ms
+    long long CAPACITY_IN_BYTES = 0; // in bytes
+
+    // ---- calibrable configurations ----
+    int PAGE_SIZE_IN_RECORDS = 0; // in records
+    int CLUSTER_SIZE = 0;         // in pages
+    int MERGE_FAN_IN = 16;        // number of runs to merge at a time
+    int MERGE_FAN_OUT = 4;
+
+    Storage(std::string name, long long capacity, int bandwidth,
+            double latency) {
+        this->name = name;
+        this->CAPACITY_IN_BYTES = capacity;
+        this->BANDWIDTH = bandwidth;
+        this->LATENCY = latency;
+        printv("Storage: %s, Capacity %sBytes,  Bandwidth %sBytes/s, "
+               "Latency %f seconds\n",
+               name.c_str(), formatNum(capacity).c_str(),
+               formatNum(bandwidth).c_str(), latency);
+        this->configure();
+    }
+
+    void configure();
+    // virtual int read(int address, char *buffer, int nBytes) = 0;
+    // virtual int write(int address, char *buffer, int nBytes) = 0;
+    // virtual int storeRun() = 0;
+    // virtual int mergeRuns() = 0;
+    // virtual void reset() = 0;
+    // virtual void printState() = 0;
+};
 
 
 // =========================================================
@@ -10,7 +75,7 @@
 // =========================================================
 
 // Singleton DRAM class
-class DRAM {
+class DRAM : public Storage {
   private:
     // ---- configurations ----
     long long maxNumRecords;
@@ -23,7 +88,9 @@ class DRAM {
 
     // ---- singleton instance ----
     static DRAM *instance;
-    DRAM() {
+    DRAM()
+        : Storage("DRAM", Config::DRAM_SIZE, Config::DRAM_BANDWIDTH,
+                  Config::DRAM_LATENCY) {
         this->data = new char[Config::DRAM_SIZE];
         this->maxNumRecords = Config::DRAM_SIZE / Config::RECORD_SIZE;
         this->bufferSizeInBytes = Config::DRAM_BANDWIDTH * Config::DRAM_LATENCY;
@@ -61,7 +128,7 @@ class DRAM {
 // =========================================================
 
 // Singleton SSD class
-class SSD {
+class SSD : public Storage {
   private:
     // ---- configurations ----
     long long maxNumRecords;
@@ -78,7 +145,9 @@ class SSD {
     // ---- singleton instance ----
     static SSD *instance;
 
-    SSD() {
+    SSD()
+        : Storage("SSD", Config::SSD_SIZE, Config::SSD_BANDWIDTH,
+                  Config::SSD_LATENCY) {
         // ---- configurations ----
         this->maxNumRecords = Config::SSD_SIZE / Config::RECORD_SIZE;
         this->bufferSizeInBytes = Config::SSD_BANDWIDTH * Config::SSD_LATENCY;
@@ -144,7 +213,7 @@ class SSD {
 // -------------------------- HDD --------------------------
 // =========================================================
 // Singleton HDD class
-class HDD {
+class HDD : public Storage {
   private:
     // ---- configurations ----
     const std::string filename = "hdd.tmp";
@@ -153,22 +222,23 @@ class HDD {
     int nRuns = 0;
     long long nRecordsPerRun = 0;
 
+    // ---- singleton instance ----
+    static HDD *instance;
 
-    HDD() {
+    HDD()
+        : Storage("HDD", Config::HDD_SIZE, Config::HDD_BANDWIDTH,
+                  Config::HDD_LATENCY) {
         std::ofstream file(this->filename, std::ios::binary);
         file.write("", 1);
         file.close();
         this->reset();
-        printv("\nHDD: Infinite size\n----\n");
     }
 
   public:
-    // delete copy constructor and copy assignment operator to prevent copies
-    HDD(HDD const &) = delete;
-    void operator=(HDD const &) = delete;
-
-    static HDD &getInstance() {
-        static HDD instance;
+    static HDD *getInstance() {
+        if (instance == nullptr) {
+            instance = new HDD();
+        }
         return instance;
     }
 
@@ -186,14 +256,23 @@ class HDD {
 
     int read(int address, char *buffer, int nBytes);
     int write(int address, char *buffer, int nBytes);
+    int readPage(std::ifstream &file, Page &page);
 
     /**
      * @brief copy records from SSD to HDD
      */
     int storeRun();
     int mergeRuns();
-    void externalSort();
-    void externalSortPlan();
+    int firstPass(int eachRunSizeInRecords);
 };
+
+
+// =========================================================
+// --------------------- External Sort ---------------------
+// =========================================================
+
+
+void externalSort();
+// void externalSortPlan();
 
 #endif // _STORAGE_H_

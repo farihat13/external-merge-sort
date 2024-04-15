@@ -16,6 +16,9 @@
 #include <vector>
 
 
+#define ROUNDUP_4K(x) (((x) + 4095) & ~4095)
+
+
 // =========================================================
 // ------------------------- Config ------------------------
 // =========================================================
@@ -28,7 +31,7 @@ class Config {
     // ---- Cache ----
     static int CACHE_SIZE; // 1 KB
     // ---- DRAM ----
-    static int DRAM_SIZE;       // 100 MB
+    static long long DRAM_SIZE; // 100 MB
     static double DRAM_LATENCY; // 0.1 ms
     static int DRAM_BANDWIDTH;  // 100 MB/s
     // ---- SSD ----
@@ -36,7 +39,7 @@ class Config {
     static double SSD_LATENCY; // 0.1 ms
     static int SSD_BANDWIDTH;  // 100 MB/s
     // ---- HDD ----
-    static int HDD_SIZE;       // Infinite
+    static long long HDD_SIZE; // Infinite
     static double HDD_LATENCY; // 10 ms
     static int HDD_BANDWIDTH;  // 100 MB/s
     // ---- Record ----
@@ -76,6 +79,11 @@ class Record {
         oss << "Record(" << std::string(data, Config::RECORD_SIZE) << ")";
         return oss.str();
     }
+    /**
+     * @brief Check if the record is valid; if all characters are alphanumeric
+     */
+    bool isValid();
+    void invalidate();
 }; // class Record
 
 std::string recordToString(char *data);

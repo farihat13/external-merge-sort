@@ -123,21 +123,19 @@ int main(int argc, char *argv[]) {
 
     // calculate derived config values and print config
     printConfig();
-
+    // // generate input file
+    // generateInputFile(Config::INPUT_FILE, Config::RECORD_SIZE,
+    //                   Config::NUM_RECORDS);
+    flushv();
     if (getInputSizeInGB() >= 0.5) { // TODO: remove this
-        fprintf(stderr, "Error: Number of records * record size > SSD size\n");
-        HDD::getInstance().externalSortPlan();
+        printf("External sort not implemented for large input size\n");
+        externalSort();
         flushv();
         exit(1);
     }
-    // generate input file
-    generateInputFile(Config::INPUT_FILE, Config::RECORD_SIZE,
-                      Config::NUM_RECORDS);
-    flushv();
 
     // sort the input file
-    HDD &hdd = HDD::getInstance();
-    hdd.externalSort();
+    // externalSort();
     flushv();
 
     return 0;

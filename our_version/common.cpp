@@ -9,9 +9,9 @@
 // ---- Cache ----
 int Config::CACHE_SIZE = 1 * 1 * 1024; // 1 KB
 // ---- DRAM ----
-int Config::DRAM_SIZE = 1 * 100 * 1024 * 1024;     // 100 MB
-double Config::DRAM_LATENCY = 1.0 / (1000 * 1000); // 10 microsecond
-int Config::DRAM_BANDWIDTH = 100 * 1024 * 1024;    // 100 GB/s
+long long Config::DRAM_SIZE = 1 * 100 * 1024 * 1024; // 100 MB
+double Config::DRAM_LATENCY = 1.0 / (1000 * 1000);   // 10 microsecond
+int Config::DRAM_BANDWIDTH = 100 * 1024 * 1024;      // 100 GB/s
 // DRAM buffer size = 1 MB
 // ---- SSD ----
 long long Config::SSD_SIZE = 10LL * 1024 * 1024 * 1024; // 10 GB
@@ -19,7 +19,7 @@ double Config::SSD_LATENCY = 1.0 / (10 * 1000);         // 0.1 ms
 int Config::SSD_BANDWIDTH = 100 * 1024 * 1024;          // 100 MB/s
 // SSD buffer size = 10 MB
 // ---- HDD ----
-int Config::HDD_SIZE = INT_MAX;                // Infinite
+long long Config::HDD_SIZE = INT_MAX;          // Infinite
 double Config::HDD_LATENCY = 1 * 10.0 / 1000;  // 10 ms
 int Config::HDD_BANDWIDTH = 100 * 1024 * 1024; // 100 MB/s
 // ---- Record ----
@@ -77,7 +77,7 @@ void readConfig(const std::string &filename) {
                 if (key == "CACHE_SIZE")
                     Config::CACHE_SIZE = stoi(value);
                 else if (key == "DRAM_SIZE")
-                    Config::DRAM_SIZE = stoi(value);
+                    Config::DRAM_SIZE = stoll(value);
                 else if (key == "DRAM_LATENCY")
                     Config::DRAM_LATENCY = stod(value);
                 else if (key == "DRAM_BANDWIDTH")
@@ -89,7 +89,7 @@ void readConfig(const std::string &filename) {
                 else if (key == "SSD_BANDWIDTH")
                     Config::SSD_BANDWIDTH = stoi(value);
                 else if (key == "HDD_SIZE")
-                    Config::HDD_SIZE = stoi(value);
+                    Config::HDD_SIZE = stoll(value);
                 else if (key == "HDD_LATENCY")
                     Config::HDD_LATENCY = stod(value);
                 else if (key == "HDD_BANDWIDTH")
@@ -161,6 +161,23 @@ std::string formatNum(long long number) {
 // =========================================================
 // ------------------------- Record ------------------------
 // =========================================================
+
+
+bool Record::isValid() {
+    if (data == nullptr)
+        return false;
+    for (int i = 0; i < Config::RECORD_SIZE; i++) {
+        if (!isalnum(data[i]))
+            return false;
+    }
+    return true;
+}
+
+void Record::invalidate() {
+    for (int i = 0; i < Config::RECORD_SIZE; i++) {
+        data[i] = 0;
+    }
+}
 
 
 std::string recordToString(char *data) {
