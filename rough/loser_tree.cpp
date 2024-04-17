@@ -1,10 +1,9 @@
+#include <algorithm>
 #include <cassert>
 #include <climits>
 #include <cstring>
 #include <iostream>
 #include <vector>
-
-using namespace std;
 
 #define RECORD_SIZE 4
 #define RECORD_KEY_SIZE 2
@@ -55,7 +54,8 @@ class Record {
 
 class LoserTree {
   private:
-    vector<Record *> loserTree;
+    std::vector<Record *> loserTree;
+    std::vector<int> indices;
     Record *dummy;
 
   public:
@@ -79,48 +79,56 @@ class LoserTree {
         if (verbose) {
             printf("loser tree: ");
             for (int i = 0; i < loserTree.size(); i++) {
-                printf("[%d]:%s ", i, loserTree[i]->repr());
+                if (i < indices.size())
+                    printf("[%d]:%s(%d) ", i, loserTree[i]->repr(), indices[i]);
+                else
+                    printf("[%d]:%s ", i, loserTree[i]->repr());
             }
             printf("\n");
         }
     }
 
-    void constructTree(vector<Record *> &inputs) {
+    void constructTree(std::vector<Record *> &inputs) {
         int nInternalNodes = inputs.size();
         if (inputs.size() % 2 == 1) {
             nInternalNodes++;
         }
-        loserTree.resize(nInternalNodes * 2, dummy);
+        this->loserTree.resize(nInternalNodes * 2, dummy);
+        this->indices.resize(nInternalNodes, -1);
+
 
         printv("nInternalNodes: %d\n", nInternalNodes);
-        printv("size of loserTree: %zu\n", loserTree.size());
+        printv("size of loserTree: %zu\n", this->loserTree.size());
 
         // Set the leaf values using the first elements of the lists
         for (int i = nInternalNodes; i < nInternalNodes + inputs.size(); i++) {
-            loserTree[i] = inputs[i - nInternalNodes];
-            if (loserTree[i] == NULL) {
+            this->loserTree[i] = inputs[i - nInternalNodes];
+            if (this->loserTree[i] == NULL) {
                 printf("Did not expect empty list\n ");
                 exit(1);
             }
         }
         if (inputs.size() % 2 == 1) {
             // Add a dummy node to make the number of leaves even
-            loserTree[nInternalNodes * 2 - 1] = dummy;
+            this->loserTree[nInternalNodes * 2 - 1] = dummy;
         }
         printTree();
 
         // Construct the loser tree from leaves up
         for (int i = nInternalNodes; i < nInternalNodes * 2; i++) {
-            Record *winner = loserTree[i];
+            Record *winner = this->loserTree[i];
             int parIdx = i; // parent index
+            int winnerIdx = i;
             while (parIdx >= 0) {
                 parIdx /= 2;
-                if (isRecordMax(loserTree[parIdx])) {
+                if (isRecordMax(this->loserTree[parIdx])) {
                     // if (loserTree[parIdx]->val == INT_MAX) {
-                    loserTree[parIdx] = winner;
+                    this->loserTree[parIdx] = winner;
+                    this->indices[parIdx] = winnerIdx;
                     break;
-                } else if (*winner > *loserTree[parIdx]) {
-                    std::swap(loserTree[parIdx], winner);
+                } else if (*winner > *this->loserTree[parIdx]) {
+                    std::swap(this->loserTree[parIdx], winner);
+                    std::swap(this->indices[parIdx], winnerIdx);
                 }
                 if (parIdx == 0) {
                     break;
@@ -143,14 +151,14 @@ class LoserTree {
         }
 
         // Trace down the tree from the root to find the winning leaf;
-        // TODO: store ptr in the tree
-        int winningIdx = 1;
-        for (int i = loserTree.size() / 2; i < loserTree.size(); i++) {
-            if (loserTree[i] == currWinner) {
-                winningIdx = i;
-                break;
-            }
-        }
+        // int winningIdx = 1;
+        // for (int i = loserTree.size() / 2; i < loserTree.size(); i++) {
+        //     if (loserTree[i] == currWinner) {
+        //         winningIdx = i;
+        //         break;
+        //     }
+        // }
+        int winningIdx = indices[0];
         printv("\n\twinner: %s, winningIdx: %d\n", currWinner->repr(),
                winningIdx);
 
@@ -161,6 +169,7 @@ class LoserTree {
             loserTree[winningIdx] = dummy;
         }
         loserTree[0] = dummy;
+        indices[0] = -1;
         printv("\t\tupdated leaf: ");
         printTree();
 
@@ -172,6 +181,7 @@ class LoserTree {
         int winnerIdx =
             loserTree[leftIdx] == loserTree[loserIdx] ? rightIdx : leftIdx;
         loserTree[parIdx] = loserTree[loserIdx];
+        indices[parIdx] = loserIdx;
         Record *winner = loserTree[winnerIdx];
 
         while (parIdx >= 0) {
@@ -183,9 +193,11 @@ class LoserTree {
             if (*winner > *loserTree[parIdx]) {
                 // if (winner->val > loserTree[parIdx]->val) {
                 std::swap(winner, loserTree[parIdx]);
+                std::swap(winnerIdx, indices[parIdx]);
             }
             if (parIdx == 0) {
                 loserTree[parIdx] = winner;
+                indices[parIdx] = winnerIdx;
                 break;
             }
         }
@@ -195,7 +207,7 @@ class LoserTree {
         return currWinner;
     }
 
-    Record *mergeKLists(vector<Record *> &lists) {
+    Record *mergeKLists(std::vector<Record *> &lists) {
         constructTree(lists);
         Record *head = new Record();
         Record *current = head;
@@ -243,7 +255,7 @@ int generateRandomInt(int min, int max) {
 
 // Function to generate random lists
 Record *generateRandomList(int length) {
-    vector<Record> result;
+    std::vector<Record> result;
     for (int i = 0; i < length; i++) {
         Record *r = new Record();
         gen_a_record(r->data, RECORD_SIZE);
@@ -269,41 +281,72 @@ int automatedTest() {
     // srand(0);
     srand(time(NULL)); // Seed the random number generator
 
-    vector<Record *> lists;
-    int numberOfLists = generateRandomInt(5, 3255); // Generate between 5 and 10 lists
+    std::vector<Record *> lists;
+    int numberOfLists =
+        generateRandomInt(5, 3455); // Generate between 5 and 10 lists
 
-    cout << "Generated " << numberOfLists << " random lists:\n";
+    std::cout << "Generated " << numberOfLists << " random lists:\n";
     int totalElements = 0;
     for (int i = 0; i < numberOfLists; i++) {
-        int length = generateRandomInt(1, 1000);
+        int length = generateRandomInt(1, 2050);
         Record *list = generateRandomList(length);
         totalElements += length;
         lists.push_back(list);
         // printList(lists.back());
     }
+    // combine the lists and sort them
+    std::vector<Record> combined;
+    for (Record *list : lists) {
+        Record *current = list;
+        while (current) {
+            combined.push_back(*current);
+            current = current->next;
+        }
+    }
+    sort(combined.begin(), combined.end());
+    // print the combined list
+    // std::cout << "Combined list: ";
+    // for (Record r : combined) {
+    //     printf("%s ", r.repr());
+    // }
 
     // Create LoserTree and merge lists
     LoserTree lt;
     Record *result = lt.mergeKLists(lists);
 
     // Print the merged result
-    // cout << "Merged list: ";
+    // std::cout << "Merged list : ";
     // printList(result);
 
     // Verify that the merged result is correctly sorted
     assert(isSorted(result));
-    cout << "Verification passed: The merged list is sorted.\n";
+    std::cout << "Verification passed: The merged list is sorted.\n";
     int count = 0;
     Record *current = result;
     while (current) {
         count++;
         current = current->next;
     }
-    cout << "Total number of elements: " << count << "/" << totalElements
-         << endl;
+    std::cout << "Total number of elements: " << count << "/" << totalElements
+              << std::endl;
     assert(count == totalElements);
-    cout << "Verification passed: The merged list contains the correct number "
-            "of elements.\n";
+    std::cout
+        << "Verification passed: The merged list contains the correct number "
+           "of elements.\n";
+
+    // match the combined list with the merged list
+    current = result;
+    for (Record r : combined) {
+        int cmp = std::strncmp(r.data, current->data, RECORD_KEY_SIZE);
+        if (cmp != 0) {
+            printf("Error: Mismatch in merged list: %s != %s\n", r.repr(),
+                   current->repr());
+        }
+        assert(cmp == 0);
+        current = current->next;
+    }
+    std::cout << "Verification passed: The merged list matches the combined "
+                 "list.\n";
 
     return 0;
 }
