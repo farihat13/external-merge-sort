@@ -1,10 +1,10 @@
 # Compiler settings
 CPPOPT=-g -Og -D_DEBUG -D_USE_LOGFILE -D_SEED #-D_SMALLCONFIG
 CXX = g++
-CXXFLAGS =$(CPPOPT) -Wall -std=c++11
+CXXFLAGS =$(CPPOPT) -Wall -std=c++17
 
 # Object files
-OBJS = common.o storage.o externalsort.o
+OBJS = common.o record.o storage.o externalsort.o
 
 # Executable name
 TARGET = externalsort
@@ -16,15 +16,18 @@ $(TARGET): $(OBJS)
 common.o: common.cpp common.h
 	$(CXX) $(CXXFLAGS) -c common.cpp
 
-storage.o: storage.cpp storage.h common.h
+record.o: record.cpp record.h common.h
+	$(CXX) $(CXXFLAGS) -c record.cpp
+
+storage.o: storage.cpp storage.h record.h common.h
 	$(CXX) $(CXXFLAGS) -c storage.cpp
 
-externalsort.o: externalsort.cpp storage.h common.h
+externalsort.o: externalsort.cpp storage.h record.h common.h
 	$(CXX) $(CXXFLAGS) -c externalsort.cpp
 
 # run rule
 run: $(TARGET)
-	./$(TARGET) -c 1024 -s 200 -o trace
+	./$(TARGET) -c 1024 -s 2000 -o trace
 runbig: $(TARGET)
 	./$(TARGET) -c 1048576 -s 2048 -o trace
 

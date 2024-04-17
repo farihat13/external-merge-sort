@@ -1,5 +1,5 @@
 {
-    "C_Cpp.clang_format_style": "{ BasedOnStyle: LLVM, IndentWidth: 4, TabWidth: 4, ColumnLimit: 80, MaxEmptyLinesToKeep: 2}",
+    "C_Cpp.clang_format_style": "{ BasedOnStyle: LLVM, IndentWidth: 4, TabWidth: 4, ColumnLimit: 100, MaxEmptyLinesToKeep: 2}",
     "todohighlight.keywords": [
         {
             "text": "TODO",
@@ -12,7 +12,43 @@
             "color": "#FFA500",
             "backgroundColor": "transparent",
             "overviewRulerColor": "grey"
-        }
+        },
+        {
+            "text": "MERGE_RUNS_SSD",
+            "color": "#FFA500",
+            "backgroundColor": "#111111",
+            "overviewRulerColor": "grey"
+        },
+        {
+            "text": "MERGE_RUNS_HDD",
+            "color": "#44DDAA",
+            "backgroundColor": "#111111",
+            "overviewRulerColor": "grey"
+        },
+        {
+            "text": "to HDD",
+            "color": "#44DDAA",
+            "backgroundColor": "yellow",
+            "overviewRulerColor": "grey"
+        },
+        {
+            "text": "to SSD",
+            "color": "#FFA500",
+            "backgroundColor": "yellow",
+            "overviewRulerColor": "grey"
+        },
+        // {
+        //     "text": "read",
+        //     "color": "black",
+        //     "backgroundColor": "#FF00FF",
+        //     "overviewRulerColor": "grey"
+        // },
+        // {
+        //     "text": "write",
+        //     "color": "black",
+        //     "backgroundColor": "#00AAAA",
+        //     "overviewRulerColor": "grey"
+        // }
     ],
     "files.associations": {
         "array": "cpp",

@@ -74,10 +74,8 @@ void gen_a_record(char *s, const int len) {
     }
 } // gen_a_record
 
-void generateInputFile(const std::string &filename, int recordSize,
-                       int numRecords) {
+void generateInputFile(const std::string &filename) {
     std::ofstream file(filename, std::ios::binary);
-    std::ofstream readablefile("readable_input.txt"); // TODO: remove later
     if (!file) {
         std::cerr << "Error opening file for writing." << std::endl;
         exit(1);
@@ -86,23 +84,25 @@ void generateInputFile(const std::string &filename, int recordSize,
 #if defined(_SEED)
     srand(0);
 #endif
-    char *record = new char[recordSize];
-    for (int i = 0; i < numRecords; ++i) {
+    char *record = new char[Config::RECORD_SIZE];
+    for (long long i = 0; i < Config::NUM_RECORDS; ++i) {
         gen_a_record(record, Config::RECORD_SIZE);
+        record[Config::RECORD_SIZE - 1] = '\n'; // TODO: remove later
         file.write(record, Config::RECORD_SIZE);
-        readablefile.write(record, Config::RECORD_SIZE);
-        readablefile.write("\n", 1);
     }
     // clean up
     file.close();
-    readablefile.close();
     delete[] record;
-    printvv("Generated %d records in file %s\n", numRecords, filename.c_str());
+    printvv("Generated %lld records in file %s\n", Config::NUM_RECORDS,
+            filename.c_str());
 
 #if defined(_DEBUG)
+    long long expected = Config::NUM_RECORDS * Config::RECORD_SIZE;
     std::ifstream inputfile(filename, std::ios::binary);
     inputfile.seekg(0, std::ios::end);
-    DebugAssert(inputfile.tellg() == numRecords * recordSize);
+    long long fileSize = inputfile.tellg();
+    printv("File size: %lld, Expected %lld\n", fileSize, expected);
+    DebugAssert(expected == fileSize);
     inputfile.close();
 #endif
 }
@@ -123,19 +123,11 @@ int main(int argc, char *argv[]) {
 
     // calculate derived config values and print config
     printConfig();
-    // // generate input file
-    // generateInputFile(Config::INPUT_FILE, Config::RECORD_SIZE,
-    //                   Config::NUM_RECORDS);
+    // generate input file
+    generateInputFile(Config::INPUT_FILE);
     flushv();
-    if (getInputSizeInGB() >= 0.5) { // TODO: remove this
-        printf("External sort not implemented for large input size\n");
-        externalSort();
-        flushv();
-        exit(1);
-    }
 
-    // sort the input file
-    // externalSort();
+    externalSort();
     flushv();
 
     return 0;

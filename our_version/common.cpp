@@ -159,37 +159,6 @@ std::string formatNum(long long number) {
 
 
 // =========================================================
-// ------------------------- Record ------------------------
-// =========================================================
-
-
-bool Record::isValid() {
-    if (data == nullptr)
-        return false;
-    for (int i = 0; i < Config::RECORD_SIZE; i++) {
-        if (!isalnum(data[i]))
-            return false;
-    }
-    return true;
-}
-
-void Record::invalidate() {
-    for (int i = 0; i < Config::RECORD_SIZE; i++) {
-        data[i] = 0;
-    }
-}
-
-
-std::string recordToString(char *data) {
-    std::string str = "";
-    for (int i = 0; i < Config::RECORD_SIZE; i++) {
-        str += data[i];
-    }
-    return str;
-}
-
-
-// =========================================================
 // ------------------------- Logger ------------------------
 // =========================================================
 

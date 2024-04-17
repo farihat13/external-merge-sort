@@ -58,35 +58,6 @@ long long getInputSizeInBytes();
 long long getInputSizeInGB();
 std::string formatNum(long long num);
 
-// =========================================================
-// ------------------------- Record ------------------------
-// =========================================================
-
-
-class Record {
-  public:
-    char *data;
-    Record() {}
-    Record(char *data) : data(data) {}
-    // ~Record() { delete[] data; }
-    // default comparison based on first 8 bytes of data
-    bool operator<(const Record &other) const {
-        return std::strncmp(data, other.data, Config::RECORD_KEY_SIZE) < 0;
-    }
-    // to string
-    std::string toString() const {
-        std::ostringstream oss;
-        oss << "Record(" << std::string(data, Config::RECORD_SIZE) << ")";
-        return oss.str();
-    }
-    /**
-     * @brief Check if the record is valid; if all characters are alphanumeric
-     */
-    bool isValid();
-    void invalidate();
-}; // class Record
-
-std::string recordToString(char *data);
 
 // =========================================================
 // ------------------------- Logger ------------------------
