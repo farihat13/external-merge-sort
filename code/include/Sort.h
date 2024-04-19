@@ -24,11 +24,19 @@ class SortIterator : public Iterator {
     ~SortIterator();
     bool next();
     void getRecord(Record *r);
+    void getPage(Page *p);
 
   private:
     SortPlan const *const _plan;
     Iterator *const _input;
     RowCount _consumed, _produced;
+
+    HDD *_hdd;
+    // SSD *_ssd;
+    DRAM *_dram;
+
+
+    void externalMergeSort();
 }; // class SortIterator
 
 

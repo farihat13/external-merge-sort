@@ -18,3 +18,6 @@ void Iterator::run() {
     }
     traceprintf("entire plan produced %lu rows\n", (unsigned long)_count);
 } // Iterator::run
+
+
+void Iterator::get(char *data, ByteCount nBytes) { TRACE(true); }

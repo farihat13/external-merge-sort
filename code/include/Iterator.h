@@ -1,10 +1,11 @@
-#ifndef ITERATOR_H
-#define ITERATOR_H
+#ifndef _ITERATOR_H_
+#define _ITERATOR_H_
 
-#include "defs.h"
 #include "Record.h"
+#include "Storage.h"
+#include "config.h"
+#include "defs.h"
 
-typedef uint64_t RowCount;
 
 class Plan {
     friend class Iterator;
@@ -24,9 +25,11 @@ class Iterator {
     void run();
     virtual bool next() = 0;
     virtual void getRecord(Record *r) = 0;
+    virtual void getPage(Page *p) = 0;
+    virtual void get(char *data, ByteCount nBytes);
 
   private:
     RowCount _count;
 }; // class Iterator
 
-#endif // ITERATOR_H
+#endif // _ITERATOR_H_

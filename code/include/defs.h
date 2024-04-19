@@ -1,9 +1,10 @@
-#ifndef DEFS_H
-#define DEFS_H
+#ifndef _DEFS_H_
+#define _DEFS_H_
 
+
+#include <cstdio>
 #include <stddef.h>
 #include <stdint.h>
-#include <cstdio>
 
 typedef uint8_t byte;
 
@@ -29,15 +30,13 @@ void Assert(bool const predicate, char const *const file, int const line);
 //
 #define ParamAssert(b) FinalAssert(b)
 
-#define traceprintf                                                            \
-    printf("%s:%d:%s ", __FILE__, __LINE__, __FUNCTION__), printf
+#define traceprintf printf("%s:%d:%s ", __FILE__, __LINE__, __FUNCTION__), printf
 
 // -----------------------------------------------------------------
 
 class Trace {
   public:
-    Trace(bool const trace, char const *const function, char const *const file,
-          int const line);
+    Trace(bool const trace, char const *const function, char const *const file, int const line);
     ~Trace();
 
   private:
@@ -53,25 +52,19 @@ class Trace {
 
 // -----------------------------------------------------------------
 
-template <class Value>
-inline bool odd(Value const value, int bits_from_lsb = 0) {
+template <class Value> inline bool odd(Value const value, int bits_from_lsb = 0) {
     return ((value >> bits_from_lsb) & Value(1)) != 0;
 }
 //
-template <class Value>
-inline bool even(Value const value, int bits_from_lsb = 0) {
+template <class Value> inline bool even(Value const value, int bits_from_lsb = 0) {
     return ((Value(1) << bits_from_lsb) & value) == 0;
 }
 
 // templates for generic min and max operations
 //
-template <class Val> inline Val min(Val const a, Val const b) {
-    return a < b ? a : b;
-}
+template <class Val> inline Val min(Val const a, Val const b) { return a < b ? a : b; }
 //
-template <class Val> inline Val max(Val const a, Val const b) {
-    return a > b ? a : b;
-}
+template <class Val> inline Val max(Val const a, Val const b) { return a > b ? a : b; }
 //
 template <class Val>
 inline Val between(Val const value, Val const low, Val const high)
@@ -129,4 +122,4 @@ char const *YesNo(bool const b);
 char const *OkBad(bool const b);
 
 
-#endif // DEFS_H
+#endif // _DEFS_H_
