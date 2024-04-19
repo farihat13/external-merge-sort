@@ -1,5 +1,11 @@
 {
     "C_Cpp.clang_format_style": "{ BasedOnStyle: LLVM, IndentWidth: 4, TabWidth: 4, ColumnLimit: 100, MaxEmptyLinesToKeep: 2}",
+    "C_Cpp.clang_format_fallbackStyle": "LLVM",
+    "editor.formatOnSave": true,
+    // add settings to set display tab size to 4 for all files 
+    "editor.tabSize": 4,
+    // force display tab size to 4 for all .cpp and .h files
+    "editor.detectIndentation": false,
     "todohighlight.keywords": [
         {
             "text": "TODO",
@@ -118,6 +124,7 @@
         "mutex": "cpp",
         "optional": "cpp",
         "ratio": "cpp",
-        "variant": "cpp"
+        "variant": "cpp",
+        "queue": "cpp"
     },
 }
