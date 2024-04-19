@@ -1,29 +1,32 @@
+#include "Filter.h"
 #include "Iterator.h"
 #include "Scan.h"
-#include "Filter.h"
 #include "Sort.h"
-#include "defs.h"
 #include "config.h"
-#include <cstring>
-#include <cstdlib>
+#include "defs.h"
 #include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <string>
 
 
+// ============================================================================
+// ----------------------------- Command Line Arguments -----------------------
+// ============================================================================
+
 /**
+ * @brief read command line arguments and update Config class
+ *  `-c` number of records
+ *  `-s` size of each record
+ *  `-o` output file
  *
- * @ brief Read command line arguments
- * `-c` number of records
- * `-s` size of each record
- * `-o` output file
  * ./ExternalSort.exe -c 20 -s 1024 -o trace0.txt
- * @ return Input
+ * @param argc
+ * @param argv
  */
-void read_cmdline_arguments(int argc, char *argv[]) {
+void readCmdlineArgs(int argc, char *argv[]) {
     if (argc < 2) {
-        fprintf(stderr,
-                "Usage: %s -c <num_records> -s <record_size> -o <trace_file>\n",
-                argv[0]);
+        fprintf(stderr, "Usage: %s -c <num_records> -s <record_size> -o <trace_file>\n", argv[0]);
         exit(1);
     }
 
@@ -60,29 +63,51 @@ void read_cmdline_arguments(int argc, char *argv[]) {
     Config::RECORD_SIZE = record_size;
     Config::NUM_RECORDS = num_records;
     Config::TRACE_FILE = trace_file;
+    Config::INPUT_FILE = "input-c" + std::to_string(Config::NUM_RECORDS) + "-s" +
+                         std::to_string(Config::RECORD_SIZE) + ".txt";
+} // readCmdlineArgs
 
-} // read_cmdline_arguments
+
+/**
+ * initialize at the very beginning, just after processing command line arguments
+ */
+void init() {
+    printConfig();
+    HDD::getInstance();
+    printf("init done\n");
+}
+
+
+/**
+ * @brief cleanup at the very end, what was initialized in init()
+ */
+void cleanup() { printf("cleanup done\n"); }
 
 
 int main(int argc, char *argv[]) {
 
-    read_cmdline_arguments(argc, argv);
-    Config::print_config();
-    Logger::init(Config::TRACE_FILE);
+    // read command line arguments
+    readCmdlineArgs(argc, argv);
 
+    // initialize anything needed
+    init();
 
-    TRACE(true);
+    // TRACE(true);
 
-    Plan *const plan = new SortPlan(new ScanPlan(Config::NUM_RECORDS));
+    // Plan *const plan = new SortPlan(new ScanPlan(Config::NUM_RECORDS));
     // new ScanPlan(Config::NUM_RECORDS);
     // new SortPlan ( new FilterPlan ( new ScanPlan (7) ) );
+    // Plan *const plan = new ScanPlan(Config::NUM_RECORDS, Config::INPUT_FILE);
+    Plan *const plan = new SortPlan(new ScanPlan(Config::NUM_RECORDS, Config::INPUT_FILE));
 
     Iterator *const it = plan->init();
     it->run();
 
     delete it;
     delete plan;
-    Logger::close();
+
+    // cleanup what was initialized in init()
+    cleanup();
 
     return 0;
 } // main

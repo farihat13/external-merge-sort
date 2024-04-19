@@ -1,9 +1,7 @@
 #include "Filter.h"
 
 
-FilterPlan::FilterPlan(Plan *const input) : _input(input) {
-    TRACE(true);
-} // FilterPlan::FilterPlan
+FilterPlan::FilterPlan(Plan *const input) : _input(input) { TRACE(true); } // FilterPlan::FilterPlan
 
 FilterPlan::~FilterPlan() {
     TRACE(true);
@@ -48,3 +46,10 @@ void FilterIterator::getRecord(Record *r) {
 
     _input->getRecord(r);
 } // FilterIterator::getRecord
+
+
+void FilterIterator::getPage(Page *p) {
+    TRACE(true);
+
+    _input->getPage(p);
+} // FilterIterator::getPage

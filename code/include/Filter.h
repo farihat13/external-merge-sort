@@ -1,5 +1,5 @@
-#ifndef FILTER_H
-#define FILTER_H
+#ifndef _FILTER_H_
+#define _FILTER_H_
 
 #include "Iterator.h"
 
@@ -23,6 +23,7 @@ class FilterIterator : public Iterator {
     ~FilterIterator();
     bool next();
     void getRecord(Record *r);
+    void getPage(Page *p);
 
   private:
     FilterPlan const *const _plan;
@@ -30,4 +31,4 @@ class FilterIterator : public Iterator {
     RowCount _consumed, _produced;
 }; // class FilterIterator
 
-#endif // FILTER_H
+#endif // _FILTER_H_
