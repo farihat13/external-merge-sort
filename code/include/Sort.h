@@ -52,7 +52,7 @@ class SortIterator : public Iterator {
      * @param pages: pointer to the first page in DRAM
      * @return number of records read
      */
-    RowCount loadInputToDRAM(Page **pages);
+    RowCount loadInputToDRAM();
     void firstPass();
 }; // class SortIterator
 

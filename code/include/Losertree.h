@@ -8,34 +8,63 @@
 #include <climits>
 #include <cstring>
 #include <functional>
-#include <iostream>
+#include <sstream>
 #include <vector>
 
 
 class LoserTree {
   private:
-    std::vector<Record *> loserTree;
+    std::string name; // for debugging
+    std::vector<RunStreamer *> loserTree;
     std::vector<int> indices;
-    Record *dummy;
+    RunStreamer *dummy;
+
+    bool isMax(RunStreamer *r) { return isRecordMax(r->getCurrRecord()); }
 
   public:
-    LoserTree() { dummy = getMaxRecord(); }
-
-    void printTree() {
-        // #if defined(_DEBUG)
-        //         printf("loser tree: ");
-        //         for (int i = 0; i < loserTree.size(); i++) {
-        //             if (i < indices.size())
-        //                 printf("[%d]:%s(%d) ", i, loserTree[i]->repr(), indices[i]);
-        //             else
-        //                 printf("[%d]:%s ", i, loserTree[i]->repr());
-        //         }
-        printf("\n");
-        // #endif
+    LoserTree() {
+        Run *dummyRun = new Run(getMaxRecord(), 1);
+        dummy = new RunStreamer(dummyRun);
+        // set the current time reabable format as name
+        std::time_t ct = std::time(0);
+        name = std::string(ctime(&ct));
+        name = name.substr(4, name.size() - 10);
     }
+
+    ~LoserTree() {
+        for (int i = 0; i < loserTree.size(); i++) {
+            if (loserTree[i] != dummy) {
+                delete loserTree[i];
+            }
+        }
+        printvv("Deleted loser tree (%s)\n", name.c_str());
+    }
+
+    // print the tree
+    char *repr() {
+        std::stringstream ss;
+        ss << "loser tree (" << name << "):";
+        for (int i = 0; i < loserTree.size(); i++) {
+            if (i < indices.size())
+                ss << "[" << i << "]:" << loserTree[i]->repr() << "(" << indices[i] << ") ";
+            else
+                ss << "[" << i << "]:" << loserTree[i]->repr() << " ";
+        }
+        std::string str = ss.str();
+        return strdup(str.c_str());
+    }
+    void printTree() { printv("%s\n", repr()); }
 
 
     void constructTree(std::vector<Run> &inputs) {
+        std::vector<RunStreamer *> runStreamers;
+        for (int i = 0; i < inputs.size(); i++) {
+            runStreamers.push_back(new RunStreamer(&inputs[i]));
+        }
+        constructTree(runStreamers);
+    }
+
+    void constructTree(std::vector<RunStreamer *> &inputs) {
         int nInternalNodes = inputs.size();
         if (inputs.size() % 2 == 1) {
             nInternalNodes++;
@@ -43,15 +72,11 @@ class LoserTree {
         this->loserTree.resize(nInternalNodes * 2, dummy);
         this->indices.resize(nInternalNodes, -1);
 
-
-        // printv("nInternalNodes: %d\n", nInternalNodes);
-        // printv("size of loserTree: %zu\n", this->loserTree.size());
-
         // Set the leaf values using the first elements of the lists
         for (int i = nInternalNodes; i < nInternalNodes + inputs.size(); i++) {
-            this->loserTree[i] = inputs[i - nInternalNodes].getHead();
+            this->loserTree[i] = inputs[i - nInternalNodes];
             if (this->loserTree[i] == NULL) {
-                printf("Did not expect empty list\n ");
+                printvv("ERROR: Did not expect empty list\n");
                 exit(1);
             }
         }
@@ -59,16 +84,16 @@ class LoserTree {
             // Add a dummy node to make the number of leaves even
             this->loserTree[nInternalNodes * 2 - 1] = dummy;
         }
-        printTree();
+        // printTree();
 
         // Construct the loser tree from leaves up
         for (int i = nInternalNodes; i < nInternalNodes * 2; i++) {
-            Record *winner = this->loserTree[i];
+            RunStreamer *winner = this->loserTree[i];
             int parIdx = i; // parent index
             int winnerIdx = i;
             while (parIdx >= 0) {
                 parIdx /= 2;
-                if (isRecordMax(this->loserTree[parIdx])) {
+                if (isMax(this->loserTree[parIdx])) {
                     // if (loserTree[parIdx]->val == INT_MAX) {
                     this->loserTree[parIdx] = winner;
                     this->indices[parIdx] = winnerIdx;
@@ -82,8 +107,8 @@ class LoserTree {
                 }
             }
         }
-        printvv("Constructed loser tree, size: %zu (#internal %zu)\n", loserTree.size(),
-                nInternalNodes);
+        // printvv("Constructed loser tree (%s), size: %zu (#internal %zu)\n", name.c_str(),
+        //         loserTree.size(), nInternalNodes);
         // printTree();
     }
 
@@ -91,7 +116,7 @@ class LoserTree {
         // printv("\t\tbefore prop: ");
         // printTree();
 
-        Record *currWinner = loserTree[0];
+        Record *currWinner = loserTree[0]->getCurrRecord();
         if (isRecordMax(currWinner)) {
             // if (currWinner->val == INT_MAX) {
             printvv("No more winners\n");
@@ -107,14 +132,20 @@ class LoserTree {
         //     }
         // }
         int winningIdx = indices[0];
-        // printv("\n\twinner: %s, winningIdx: %d\n", currWinner->repr(), winningIdx);
+        // printv("\n\twinner: %s, winningIdx: %d\n", currWinner->reprKey(), winningIdx);
 
         // Update the tree with the next value from the list corresponding
         // to the found leaf
-        loserTree[winningIdx] = loserTree[winningIdx]->next;
-        if (loserTree[winningIdx] == NULL) {
+        // loserTree[winningIdx] = loserTree[winningIdx]->next;
+        Record *nextRecord = loserTree[winningIdx]->moveNext();
+        if (nextRecord == NULL) {
             loserTree[winningIdx] = dummy;
         }
+        // if (loserTree[winningIdx] == NULL) {
+        //     loserTree[winningIdx] = dummy;
+        // } else {
+        //     loserTree[winningIdx]->moveNext(); // move to the next record
+        // }
         loserTree[0] = dummy;
         indices[0] = -1;
         // printv("\t\tupdated leaf: ");
@@ -127,7 +158,7 @@ class LoserTree {
         int winnerIdx = loserTree[leftIdx] == loserTree[loserIdx] ? rightIdx : leftIdx;
         loserTree[parIdx] = loserTree[loserIdx];
         indices[parIdx] = loserIdx;
-        Record *winner = loserTree[winnerIdx];
+        RunStreamer *winner = loserTree[winnerIdx];
 
         while (parIdx >= 0) {
             parIdx /= 2;
@@ -151,7 +182,7 @@ class LoserTree {
         return currWinner;
     }
 
-    Record *mergeKLists(std::vector<Run> &lists) {
+    Record *mergeKLists(std::vector<RunStreamer *> &lists) {
         constructTree(lists);
         Record *head = new Record();
         Record *current = head;

@@ -64,6 +64,7 @@ bool isRecordMax(Record *r);
 // ------------------------- Run ---------------------------
 // =========================================================
 
+
 class Run {
   private:
     Record *runHead;
@@ -75,30 +76,16 @@ class Run {
     // getters
     Record *getHead() { return runHead; }
     RowCount getSize() { return size; }
-};
 
-class RunStreamer {
-  private:
-    Run *run;
-    Record *currentRecord;
-
-  public:
-    RunStreamer(Run *run) : run(run), currentRecord(run->getHead()) {}
-
-    bool hasNext() { return currentRecord != nullptr; }
-
-    Record *getNext() {
-        if (currentRecord == nullptr) {
-            return nullptr;
+    // print
+    void printRun() {
+        Record *curr = runHead;
+        while (curr != nullptr) {
+            std::cout << curr->reprKey() << std::endl;
+            curr = curr->next;
         }
-        Record *ret = currentRecord;
-        currentRecord = currentRecord->next;
-        return ret;
     }
-
-    Record *peekNext() { return currentRecord; }
-
-}; // class RunStreamer
+};
 
 
 // =========================================================
@@ -117,10 +104,12 @@ class Page {
      * The page is an vector of records pointers
      * This constructor will NOT allocate memory for records
      */
-    Page(RowCount capacityInRecords) : capacity(capacityInRecords), next(nullptr) {
+    Page(RowCount capacityInRecords) : capacity(capacityInRecords) {
         if (capacity < 0) {
             throw std::runtime_error("Error: Page capacity cannot be negative");
         }
+        this->records.reserve(capacity);
+        this->next = nullptr;
     }
     ~Page() {
         for (auto rec : records) {
@@ -142,7 +131,7 @@ class Page {
      */
     int addRecord(Record *rec);
     int addNextPage(Page *page) {
-        this->getLastRecord()->next = page->getFirstRecord();
+        // this->getLastRecord()->next = page->getFirstRecord();
         this->next = page;
         return 0;
     }
@@ -162,7 +151,7 @@ class Page {
     int write(std::ofstream &os);
 
     // validation
-    bool isSorted() const { return std::is_sorted(records.begin(), records.end()); }
+    bool isSorted() const;
     bool isValid() const;
 
     friend class RunWriter;
@@ -220,11 +209,103 @@ class RunWriter {
         }
     }
 
-    void writeNextPage(Page *page);
-    void writeNextPages(std::vector<Page *> &pages);
+    RowCount writeNextPage(Page *page);
+    RowCount writeNextPages(std::vector<Page *> &pages);
 
-    void writeNextRun(Run &run);
+    RowCount writeNextRun(Run &run);
 }; // class RunWriter
 
+
+// =========================================================
+// ----------------------- RunStreamer ---------------------
+// =========================================================
+
+
+class RunStreamer {
+  private:
+    Record *currentRecord;
+
+    // read from file
+    RunReader *reader;
+    Page *currentPage;
+    int readAhead;
+
+  public:
+    RunStreamer(Run *run) : currentRecord(run->getHead()), reader(nullptr) {
+        if (currentRecord == nullptr) {
+            throw std::runtime_error("Error: RunStreamer initialized with empty run");
+        }
+    }
+
+    RunStreamer(RunReader *reader, int readAhead = 1) : reader(reader), readAhead(readAhead) {
+        currentPage = reader->readNextPage();
+        currentRecord = currentPage->getFirstRecord();
+
+        if (currentRecord == nullptr) {
+            throw std::runtime_error("Error: RunStreamer initialized with empty run");
+        }
+        if (readAhead > 1) {
+            readAheadPages(readAhead - 1);
+        }
+    }
+
+    void readAheadPages(int nPages) {
+        // printvv("DEBUG: readAheadPages(%d)\n", nPages);
+        Page *page = currentPage;
+        for (int i = 0; i < nPages; i++) {
+            Page *p = reader->readNextPage();
+            if (p == nullptr) {
+                break;
+            }
+            page->addNextPage(p);
+            page = p;
+        }
+    }
+    // bool hasNext() { return currentRecord->next != nullptr; }
+
+    Record *moveNext() {
+        // if reader does not exist
+        if (reader == nullptr) {
+            if (currentRecord->next == nullptr) {
+                return nullptr;
+            }
+            currentRecord = currentRecord->next;
+            return currentRecord;
+        }
+
+        // if reader exists
+        if (currentRecord == currentPage->getLastRecord()) {
+            currentPage = currentPage->getNext();
+            if (currentPage == nullptr) { // no more page in memory
+                // read new page and set current record to first record
+                currentPage = reader->readNextPage();
+                if (currentPage == nullptr) {
+                    return nullptr;
+                }
+                currentRecord = currentPage->getFirstRecord();
+                if (readAhead > 1) {
+                    readAheadPages(readAhead - 1);
+                }
+            } else { // more pages in memory
+                currentRecord = currentPage->getFirstRecord();
+            }
+        } else {
+            currentRecord = currentRecord->next;
+        }
+        return currentRecord;
+    }
+
+    Record *getCurrRecord() { return currentRecord; }
+
+    // default comparison based on first 8 bytes of data
+    bool operator<(const RunStreamer &other) const { return *currentRecord < *other.currentRecord; }
+    bool operator>(const RunStreamer &other) const { return *currentRecord > *other.currentRecord; }
+    // equality comparison based on all bytes of data
+    bool operator==(const RunStreamer &other) const {
+        return *currentRecord == *other.currentRecord;
+    }
+
+    char *repr() { return currentRecord->reprKey(); }
+}; // class RunStreamer
 
 #endif // _RECORD_H_

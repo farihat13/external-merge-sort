@@ -72,7 +72,6 @@ int Page::addRecord(Record *rec) {
 
 
 int Page::read(std::ifstream &is) {
-    TRACE(true);
     if (is.eof()) {
         traceprintf("EOF reached\n");
         return 0;
@@ -113,6 +112,17 @@ int Page::write(std::ofstream &os) {
     return this->sizeInRecords();
 }
 
+bool Page::isSorted() const {
+    Record *rec = records[0];
+    while (rec->next != nullptr) {
+        if (rec->next->data < rec->data) {
+            return false;
+        }
+        rec = rec->next;
+    }
+    return true;
+}
+
 
 bool Page::isValid() const {
     // 1. check if capacity exceeds size of records
@@ -146,7 +156,6 @@ Page *RunReader::readNextPage() {
     // 1. read a page
     int nRecords = page->read(is);
     if (nRecords == 0) {
-        delete page;
         return nullptr;
     }
     // 2. if page is not valid, throw error
@@ -188,7 +197,7 @@ std::vector<Page *> RunReader::readNextPages(int nPages) {
 // =========================================================
 
 
-void RunWriter::writeNextPage(Page *page) {
+RowCount RunWriter::writeNextPage(Page *page) {
     // 1. check validity of a page
     if (!page->isValid()) {
         throw std::runtime_error("Error: Page is not valid");
@@ -203,21 +212,27 @@ void RunWriter::writeNextPage(Page *page) {
         throw std::runtime_error("Error: Writing " + std::to_string(nRecords) +
                                  " records, expected " + std::to_string(page->sizeInRecords()));
     }
+    return nRecords;
 }
 
-void RunWriter::writeNextPages(std::vector<Page *> &pages) {
+RowCount RunWriter::writeNextPages(std::vector<Page *> &pages) {
+    RowCount totalRecords = 0;
     for (auto page : pages) {
-        writeNextPage(page);
+        totalRecords += writeNextPage(page);
     }
+    return totalRecords;
 }
 
-void RunWriter::writeNextRun(Run &run) {
+RowCount RunWriter::writeNextRun(Run &run) {
     Record *rec = run.getHead();
+    RowCount nRecords = 0;
     while (rec != nullptr) {
         os.write(rec->data, Config::RECORD_SIZE);
         if (!os) {
             throw std::runtime_error("Error: Writing to file");
         }
+        nRecords++;
         rec = rec->next;
     }
+    return nRecords;
 }
