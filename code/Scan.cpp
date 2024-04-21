@@ -56,7 +56,7 @@ ScanIterator::ScanIterator(ScanPlan const *const plan) : _plan(plan), _count(0) 
         // seed is fixed for reproducibility
         srand(100);
 #endif
-
+        traceprintf("generating input file '%s'\n", plan->_filename.c_str());
         std::ofstream input_file(_plan->_filename, std::ios::binary);
         char *record = new char[Config::RECORD_SIZE];
         for (RowCount i = 0; i < plan->_count; i++) {
@@ -68,44 +68,59 @@ ScanIterator::ScanIterator(ScanPlan const *const plan) : _plan(plan), _count(0) 
         traceprintf("generated %lu records\n", (unsigned long)(plan->_count));
         delete[] record;
 
-#if defined(_DEBUG)
-        // verify the file size
-        std::ifstream inputfile(_plan->_filename, std::ios::binary);
-        inputfile.seekg(0, std::ios::end);
-        long long file_size = inputfile.tellg();
-        long long expected = plan->_count * Config::RECORD_SIZE;
-        if (file_size != expected) {
-            traceprintf("file size %lld != expected %lld\n", file_size, expected);
-        }
-#endif
+        // #if defined(_VALIDATE)
+        //         // verify the file size
+        //         std::ifstream inputfile(_plan->_filename, std::ios::binary);
+        //         inputfile.seekg(0, std::ios::end);
+        //         long long file_size = inputfile.tellg();
+        //         long long expected = plan->_count * Config::RECORD_SIZE;
+        //         printv("VALIDATE: file size %lld == expected %lld\n", file_size, expected);
+        //         assert(file_size == expected && "file size mismatch");
+        //         inputfile.close();
+        // #endif
     }
 
-    this->_file.open(_plan->_filename, std::ios::binary);
-    this->_file.seekg(0, std::ios::beg);
+    printv("INFO: input filename: '%s'\n", _plan->_filename.c_str());
+    printv("\tinput file size %llu bytes / %llu MB / %llu GB\n", getInputSizeInBytes(),
+           BYTE_TO_MB(getInputSizeInBytes()), BYTE_TO_GB(getInputSizeInBytes()));
+    printv("\tinput file has %llu records\n", _plan->_count);
+
+    // this->_file.open(_plan->_filename, std::ios::binary);
+    // this->_file.seekg(0, std::ios::beg);
 
 } // ScanIterator::ScanIterator
 
 
 ScanIterator::~ScanIterator() {
     TRACE(true);
-    this->_file.close();
-    traceprintf("produced %lu of %lu rows\n", (unsigned long)(_count),
-                (unsigned long)(_plan->_count));
+    // this->_file.close();
+    // traceprintf("produced %lu of %lu rows\n", (unsigned long)(_count),
+    // (unsigned long)(_plan->_count));
 } // ScanIterator::~ScanIterator
 
 bool ScanIterator::next() {
     TRACE(true);
-    if (_count >= _plan->_count)
-        return false;
-    return true;
+    return false;
+    // if (this->_file.eof()) {
+    //     traceprintf("reached end of file\n");
+    //     traceprintf("read %lu of %lu rows\n", (unsigned long)(_count),
+    //                 (unsigned long)(_plan->_count));
+    //     return false;
+    // }
+    // if (_count >= _plan->_count) {
+    //     traceprintf("read all input rows. %lu of %lu rows\n", (unsigned long)(_count),
+    //                 (unsigned long)(_plan->_count));
+    //     return false;
+    // }
+    // return true;
 } // ScanIterator::next
 
 void ScanIterator::getRecord(Record *r) { TRACE(true); }
 
 void ScanIterator::getPage(Page *p) {
-    TRACE(true);
-    p->read(this->_file);
-    traceprintf("read %llu records\n", p->sizeInRecords());
-    this->_currpage = p;
-    _count += p->sizeInRecords();
+    // TRACE(true);
+    // p->read(this->_file);
+    // traceprintf("read %llu records\n", p->sizeInRecords());
+    // this->_currpage = p;
+    // _count += p->sizeInRecords();
 } // ScanIterator::getPage

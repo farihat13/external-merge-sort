@@ -1,5 +1,5 @@
 {
-    "C_Cpp.clang_format_style": "{ BasedOnStyle: LLVM, IndentWidth: 4, TabWidth: 4, ColumnLimit: 100, MaxEmptyLinesToKeep: 2}",
+    "C_Cpp.clang_format_style": "{ BasedOnStyle: LLVM, IndentWidth: 4, TabWidth: 4, ColumnLimit: 100, MaxEmptyLinesToKeep: 2, AllowShortBlocksOnASingleLine: true}",
     "C_Cpp.clang_format_fallbackStyle": "LLVM",
     "editor.formatOnSave": true,
     // add settings to set display tab size to 4 for all files 
@@ -43,18 +43,48 @@
             "backgroundColor": "yellow",
             "overviewRulerColor": "grey"
         },
-        // {
-        //     "text": "read",
-        //     "color": "black",
-        //     "backgroundColor": "#FF00FF",
-        //     "overviewRulerColor": "grey"
-        // },
-        // {
-        //     "text": "write",
-        //     "color": "black",
-        //     "backgroundColor": "#00AAAA",
-        //     "overviewRulerColor": "grey"
-        // }
+        {
+            "text": "ACCESS ->",
+            "color": "black",
+            "backgroundColor": "lime",
+            "overviewRulerColor": "grey"
+        },
+        {
+            "text": "STATE ->",
+            "color": "white",
+            "backgroundColor": "skyblue",
+            "overviewRulerColor": "grey"
+        },
+        {
+            "text": "DEBUG: ",
+            "color": "black",
+            "backgroundColor": "lightgrey",
+            "overviewRulerColor": "grey"
+        },
+        {
+            "text": "INFO: ",
+            "color": "black",
+            "backgroundColor": "yellow",
+            "overviewRulerColor": "grey"
+        },
+        {
+            "text": "ERROR: ",
+            "color": "red",
+            "backgroundColor": "orange",
+            "overviewRulerColor": "grey"
+        },
+        {
+            "text": "VALIDATE: ",
+            "color": "lime",
+            "backgroundColor": "transparent",
+            "overviewRulerColor": "grey"
+        },
+        {
+            "text": "WARNING: ",
+            "color": "red",
+            "backgroundColor": "transparent",
+            "overviewRulerColor": "grey"
+        }
     ],
     "files.associations": {
         "array": "cpp",

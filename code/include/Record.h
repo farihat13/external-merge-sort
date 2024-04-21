@@ -57,6 +57,48 @@ class Record {
 
 extern Record *MAX_RECORD;
 Record *getMaxRecord();
+bool isRecordMax(Record *r);
+
+
+// =========================================================
+// ------------------------- Run ---------------------------
+// =========================================================
+
+class Run {
+  private:
+    Record *runHead;
+    RowCount size;
+
+  public:
+    Run(Record *head, RowCount size) : runHead(head), size(size) {}
+
+    // getters
+    Record *getHead() { return runHead; }
+    RowCount getSize() { return size; }
+};
+
+class RunStreamer {
+  private:
+    Run *run;
+    Record *currentRecord;
+
+  public:
+    RunStreamer(Run *run) : run(run), currentRecord(run->getHead()) {}
+
+    bool hasNext() { return currentRecord != nullptr; }
+
+    Record *getNext() {
+        if (currentRecord == nullptr) {
+            return nullptr;
+        }
+        Record *ret = currentRecord;
+        currentRecord = currentRecord->next;
+        return ret;
+    }
+
+    Record *peekNext() { return currentRecord; }
+
+}; // class RunStreamer
 
 
 // =========================================================
@@ -75,7 +117,7 @@ class Page {
      * The page is an vector of records pointers
      * This constructor will NOT allocate memory for records
      */
-    Page(RowCount capacityInRecords) : capacity(capacityInRecords) {
+    Page(RowCount capacityInRecords) : capacity(capacityInRecords), next(nullptr) {
         if (capacity < 0) {
             throw std::runtime_error("Error: Page capacity cannot be negative");
         }
@@ -92,6 +134,7 @@ class Page {
     RowCount sizeInRecords() { return records.size(); }
     Record *getFirstRecord() { return records.front(); }
     Record *getLastRecord() { return records.back(); }
+    Page *getNext() { return next; }
 
     // utility functions
     /**
@@ -99,7 +142,8 @@ class Page {
      */
     int addRecord(Record *rec);
     int addNextPage(Page *page) {
-        next = page;
+        this->getLastRecord()->next = page->getFirstRecord();
+        this->next = page;
         return 0;
     }
 
@@ -167,6 +211,7 @@ class RunWriter {
         if (!os) {
             throw std::runtime_error("Cannot open file: " + filename);
         }
+        // printvv("DEBUG: RunWriter opened '%s'\n", filename.c_str());
     }
 
     ~RunWriter() {
@@ -177,6 +222,8 @@ class RunWriter {
 
     void writeNextPage(Page *page);
     void writeNextPages(std::vector<Page *> &pages);
+
+    void writeNextRun(Run &run);
 }; // class RunWriter
 
 
