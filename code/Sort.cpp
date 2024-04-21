@@ -55,7 +55,7 @@ void SortIterator::getRecord(Record *r) { TRACE(true); } // SortIterator::getRec
 void SortIterator::getPage(Page *p) { TRACE(true); } // SortIterator::getPage
 
 
-RowCount SortIterator::loadInputToDRAM(Page **pages) {
+RowCount SortIterator::loadInputToDRAM() {
     TRACE(true);
     RowCount nRecords = 0; // number of records read
     PageCount nPages = 0;  // number of pages read
@@ -77,7 +77,6 @@ RowCount SortIterator::loadInputToDRAM(Page **pages) {
            nRecords * Config::RECORD_SIZE, _hdd->getAccessTimeInMillis(nRecords));
     printv("DEBUG: %llu Disk pages / %llu records read from HDD to RAM\n", nPages, nRecords);
     flushv();
-    // return *pages, nRead;
     return nRecords;
 }
 
@@ -106,12 +105,11 @@ void SortIterator::firstPass() {
         if (_ssdCurrSize + nRecordsNext > _ssd->getMergeFanInRecords()) {
             // spill some runs to HDD
             _ssd->spillRunsToHDD(_hdd);
-                }
+        }
 
         // 1. Read records from input file to DRAM
         _dram->resetRecords();
-        Page *head; // the head of the linked list of pages in DRAM
-        RowCount nRecords = this->loadInputToDRAM(&head);
+        RowCount nRecords = this->loadInputToDRAM();
         if (nRecords == 0) {
             printvv("WARNING: no records read\n");
             break;

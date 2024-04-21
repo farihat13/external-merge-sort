@@ -1,4 +1,5 @@
 #include "config.h"
+#include <sys/stat.h>
 
 // =========================================================
 // ------------------------- Config ------------------------
@@ -8,19 +9,19 @@
 // ---- Cache ----
 int Config::CACHE_SIZE = 1 * 1024 * 1024; // 1 MB
 // ---- DRAM ----
-ByteCount Config::DRAM_SIZE = 1 * 100 * 1024 * 1024; // 100 MB
-double Config::DRAM_LATENCY = 1.0 / (1000 * 1000);   // 10 microsecond
-int Config::DRAM_BANDWIDTH = 100 * 1024 * 1024;      // 100 GB/s
+ByteCount Config::DRAM_CAPACITY = 1LL * 100 * 1024 * 1024; // 100 MB
+double Config::DRAM_LATENCY = 1.0 / (1000 * 1000);         // 10 microsecond
+int Config::DRAM_BANDWIDTH = 100 * 1024 * 1024;            // 100 GB/s
 // DRAM buffer size = 1 MB
 // ---- SSD ----
-ByteCount Config::SSD_SIZE = 1LL * 1024 * 1024 * 1024; // 10 GB TODO: change to 10GB
-double Config::SSD_LATENCY = 1.0 / (10 * 1000);        // 0.1 ms
-int Config::SSD_BANDWIDTH = 100 * 1024 * 1024;         // 100 MB/s
+ByteCount Config::SSD_CAPACITY = 1LL * 1024 * 1024 * 1024; // 10 GB TODO: change to 10GB
+double Config::SSD_LATENCY = 1.0 / (10 * 1000);            // 0.1 ms
+int Config::SSD_BANDWIDTH = 100 * 1024 * 1024;             // 100 MB/s
 // SSD buffer size = 10 MB
 // ---- HDD ----
-ByteCount Config::HDD_SIZE = INT_MAX;          // Infinite
-double Config::HDD_LATENCY = 1 * 10.0 / 1000;  // 10 ms
-int Config::HDD_BANDWIDTH = 100 * 1024 * 1024; // 100 MB/s
+ByteCount Config::HDD_CAPACITY = INT_MAX * 1LL; // Infinite
+double Config::HDD_LATENCY = 1 * 10.0 / 1000;   // 10 ms
+int Config::HDD_BANDWIDTH = 100 * 1024 * 1024;  // 100 MB/s
 // ---- Record ----
 int Config::RECORD_KEY_SIZE = 8;     // 8 bytes
 int Config::RECORD_SIZE = 1024;      // 1024 bytes
@@ -36,15 +37,15 @@ void printConfig() {
     // ---- Cache ----
     printv("\tCACHE_SIZE: %d bytes\n", Config::CACHE_SIZE);
     // ---- DRAM ----
-    printv("\tDRAM_SIZE: %d bytes\n", Config::DRAM_SIZE);
+    printv("\tDRAM_SIZE: %d bytes\n", Config::DRAM_CAPACITY);
     printv("\tDRAM_LATENCY: %f\n", Config::DRAM_LATENCY);
     printv("\tDRAM_BANDWIDTH: %d\n", Config::DRAM_BANDWIDTH);
     // ---- SSD ----
-    printv("\tSSD_SIZE: %lld bytes\n", Config::SSD_SIZE);
+    printv("\tSSD_SIZE: %lld bytes\n", Config::SSD_CAPACITY);
     printv("\tSSD_LATENCY: %f\n", Config::SSD_LATENCY);
     printv("\tSSD_BANDWIDTH: %d\n", Config::SSD_BANDWIDTH);
     // ---- HDD ----
-    printv("\tHDD_SIZE: %d bytes\n", Config::HDD_SIZE);
+    printv("\tHDD_SIZE: %d bytes\n", Config::HDD_CAPACITY);
     printv("\tHDD_LATENCY: %f\n", Config::HDD_LATENCY);
     printv("\tHDD_BANDWIDTH: %d\n", Config::HDD_BANDWIDTH);
     // ---- Record ----
@@ -76,19 +77,19 @@ void readConfig(const std::string &filename) {
                 if (key == "CACHE_SIZE")
                     Config::CACHE_SIZE = stoi(value);
                 else if (key == "DRAM_SIZE")
-                    Config::DRAM_SIZE = stoll(value);
+                    Config::DRAM_CAPACITY = stoll(value);
                 else if (key == "DRAM_LATENCY")
                     Config::DRAM_LATENCY = stod(value);
                 else if (key == "DRAM_BANDWIDTH")
                     Config::DRAM_BANDWIDTH = stoi(value);
                 else if (key == "SSD_SIZE")
-                    Config::SSD_SIZE = stoll(value);
+                    Config::SSD_CAPACITY = stoll(value);
                 else if (key == "SSD_LATENCY")
                     Config::SSD_LATENCY = stod(value);
                 else if (key == "SSD_BANDWIDTH")
                     Config::SSD_BANDWIDTH = stoi(value);
                 else if (key == "HDD_SIZE")
-                    Config::HDD_SIZE = stoll(value);
+                    Config::HDD_CAPACITY = stoll(value);
                 else if (key == "HDD_LATENCY")
                     Config::HDD_LATENCY = stod(value);
                 else if (key == "HDD_BANDWIDTH")
@@ -232,4 +233,15 @@ void flushVerbose() {
 #else
     std::fflush(stdout);
 #endif
+}
+
+
+// =========================================================
+// ----------------------- Utilities -----------------------
+// =========================================================
+
+ByteCount getFileSize(const std::string &filename) {
+    struct stat stat_buf = {0};
+    int rc = stat(filename.c_str(), &stat_buf);
+    return rc == 0 ? stat_buf.st_size : -1;
 }

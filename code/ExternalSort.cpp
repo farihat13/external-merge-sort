@@ -83,7 +83,15 @@ void init() {
 /**
  * @brief cleanup at the very end, what was initialized in init()
  */
-void cleanup() { printf("cleanup done\n"); }
+void cleanup() {
+    delete HDD::getInstance();
+    printv("deleted HDD\n");
+    delete SSD::getInstance();
+    printv("deleted SSD\n");
+    delete DRAM::getInstance();
+    printv("deleted DRAM\n");
+    printf("cleanup done\n");
+}
 
 
 int main(int argc, char *argv[]) {

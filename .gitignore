@@ -47,3 +47,5 @@ our_version/log.txt
 our_version/*.tmp
 our_version/externalsort
 rough/*
+*SSD_runs*
+*HDD_runs*

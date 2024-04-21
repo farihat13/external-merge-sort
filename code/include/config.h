@@ -18,6 +18,8 @@
 #include <vector>
 
 
+#define ROUNDUP(x, byY) (((x) + (byY - 1)) & ~(byY - 1))
+#define ROUNDDOWN(x, byY) ((x) & ~(byY - 1))
 #define ROUNDUP_4K(x) (((x) + 4095) & ~4095)
 #define BYTE_TO_KB(x) ((x) / 1024)
 #define BYTE_TO_MB(x) ((x) / (1024 * 1024))
@@ -41,17 +43,17 @@ class Config {
     // ---- Cache ----
     static int CACHE_SIZE; // 1 KB
     // ---- DRAM ----
-    static ByteCount DRAM_SIZE; // 100 MB
-    static double DRAM_LATENCY; // 0.1 ms
-    static int DRAM_BANDWIDTH;  // 100 MB/s
+    static ByteCount DRAM_CAPACITY; // 100 MB
+    static double DRAM_LATENCY;     // 0.1 ms
+    static int DRAM_BANDWIDTH;      // 100 MB/s
     // ---- SSD ----
-    static ByteCount SSD_SIZE; // 10 GB
-    static double SSD_LATENCY; // 0.1 ms
-    static int SSD_BANDWIDTH;  // 100 MB/s
+    static ByteCount SSD_CAPACITY; // 10 GB
+    static double SSD_LATENCY;     // 0.1 ms
+    static int SSD_BANDWIDTH;      // 100 MB/s
     // ---- HDD ----
-    static ByteCount HDD_SIZE; // Infinite
-    static double HDD_LATENCY; // 10 ms
-    static int HDD_BANDWIDTH;  // 100 MB/s
+    static ByteCount HDD_CAPACITY; // Infinite
+    static double HDD_LATENCY;     // 10 ms
+    static int HDD_BANDWIDTH;      // 100 MB/s
     // ---- Record ----
     static int RECORD_KEY_SIZE;  // 8 bytes
     static int RECORD_SIZE;      // 1024 bytes
@@ -115,6 +117,14 @@ void printVerbose(bool vv, char const *const file, int const line, char const *c
 
 void flushVerbose();
 #define flushv() flushVerbose()
+
+
+// =========================================================
+// ----------------------- Utilities -----------------------
+// =========================================================
+
+
+ByteCount getFileSize(const std::string &filename);
 
 
 #endif // _CONFIG_H_
