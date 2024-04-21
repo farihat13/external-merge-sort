@@ -1,5 +1,5 @@
 # compiler options
-CPPOPT=-g -Og -D_DEBUG #-D_USE_LOGFILE
+CPPOPT=-g -Og -D_DEBUG -D_VALIDATE #-D_USE_LOGFILE
 # -O2 -Os -Ofast
 # -fprofile-generate -fprofile-use
 
@@ -31,8 +31,16 @@ trace : ExternalSort.exe Makefile
 
 # run rule
 run: $(TARGET)
-	# @date > trace
-	./$(TARGET) -c 2024 -s 2000 
+	./$(TARGET) -c 2000000 -s 1000 
+
+run2G: $(TARGET)
+	@date > trace
+	./$(TARGET) -c 2000000 -s 1000 >> trace
+	@size -t $(TARGET) $(OBJS) | sort -r >> trace
+
+run100M: $(TARGET)
+	@date > trace
+	./$(TARGET) -c 100000 -s 1000 >> trace
 	@size -t $(TARGET) $(OBJS) | sort -r >> trace
 
 list : Makefile
@@ -44,4 +52,5 @@ clean :
 	@rm -f $(OBJS) ExternalSort.exe ExternalSort.exe.stackdump trace
 
 cleanall:
-	@rm -f $(OBJS) ExternalSort.exe ExternalSort.exe.stackdump trace list count input.txt output.txt
+	@rm -f $(OBJS) ExternalSort.exe ExternalSort.exe.stackdump trace list count input*.txt output*.txt
+	@rm -rf HDD_runs SSD_runs

@@ -43,6 +43,11 @@ Record *getMaxRecord() {
     }
     return MAX_RECORD;
 }
+bool isRecordMax(Record *r) {
+    char a = getMaxRecord()->data[0];
+    char b = r->data[0];
+    return a == b;
+}
 
 // =========================================================
 // -------------------------- Page -------------------------
@@ -203,5 +208,16 @@ void RunWriter::writeNextPage(Page *page) {
 void RunWriter::writeNextPages(std::vector<Page *> &pages) {
     for (auto page : pages) {
         writeNextPage(page);
+    }
+}
+
+void RunWriter::writeNextRun(Run &run) {
+    Record *rec = run.getHead();
+    while (rec != nullptr) {
+        os.write(rec->data, Config::RECORD_SIZE);
+        if (!os) {
+            throw std::runtime_error("Error: Writing to file");
+        }
+        rec = rec->next;
     }
 }

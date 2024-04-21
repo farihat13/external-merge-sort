@@ -19,6 +19,14 @@
 
 
 #define ROUNDUP_4K(x) (((x) + 4095) & ~4095)
+#define BYTE_TO_KB(x) ((x) / 1024)
+#define BYTE_TO_MB(x) ((x) / (1024 * 1024))
+#define BYTE_TO_GB(x) ((x) / (1024 * 1024 * 1024))
+#define MB_TO_BYTE(x) ((x) * (1024 * 1024))
+#define GB_TO_BYTE(x) ((x) * (1024 * 1024 * 1024))
+
+#define SEC_TO_MS(x) ((x) * 1000)
+#define MS_TO_SEC(x) ((x) / 1000)
 
 
 // =========================================================
@@ -57,6 +65,7 @@ class Config {
 void printConfig();
 void readConfig(const std::string &configFile);
 ByteCount getInputSizeInBytes();
+ByteCount getInputSizeInMB();
 ByteCount getInputSizeInGB();
 std::string formatNum(uint64_t num);
 

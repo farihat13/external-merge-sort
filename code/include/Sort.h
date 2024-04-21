@@ -31,12 +31,29 @@ class SortIterator : public Iterator {
     Iterator *const _input;
     RowCount _consumed, _produced;
 
-    HDD *_hdd;
-    // SSD *_ssd;
-    DRAM *_dram;
-
+    // ==== external merge sort ====
 
     void externalMergeSort();
+
+    // utility variables for external merge sort
+    HDD *_hdd;
+    SSD *_ssd;
+    DRAM *_dram;
+    RowCount _hddCapacity;
+    RowCount _hddPageSize;
+    RowCount _ssdCapacity;
+    RowCount _ssdPageSize;
+    RowCount _dramCapacity;
+    RowCount _dramPageSize;
+
+    // utility functions for external merge sort
+    /**
+     * @brief Load input data from Disk to DRAM
+     * @param pages: pointer to the first page in DRAM
+     * @return number of records read
+     */
+    RowCount loadInputToDRAM(Page **pages);
+    void firstPass();
 }; // class SortIterator
 
 

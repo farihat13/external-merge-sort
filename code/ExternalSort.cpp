@@ -74,6 +74,8 @@ void readCmdlineArgs(int argc, char *argv[]) {
 void init() {
     printConfig();
     HDD::getInstance();
+    SSD::getInstance();
+    DRAM::getInstance();
     printf("init done\n");
 }
 
@@ -97,7 +99,6 @@ int main(int argc, char *argv[]) {
     // Plan *const plan = new SortPlan(new ScanPlan(Config::NUM_RECORDS));
     // new ScanPlan(Config::NUM_RECORDS);
     // new SortPlan ( new FilterPlan ( new ScanPlan (7) ) );
-    // Plan *const plan = new ScanPlan(Config::NUM_RECORDS, Config::INPUT_FILE);
     Plan *const plan = new SortPlan(new ScanPlan(Config::NUM_RECORDS, Config::INPUT_FILE));
 
     Iterator *const it = plan->init();
