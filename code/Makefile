@@ -31,7 +31,7 @@ trace : ExternalSort.exe Makefile
 
 # run rule
 run: $(TARGET)
-	./$(TARGET) -c 2000000 -s 1000 
+	./$(TARGET) -c 1200000 -s 1000
 
 run2G: $(TARGET)
 	@date > trace
@@ -39,9 +39,9 @@ run2G: $(TARGET)
 	@size -t $(TARGET) $(OBJS) | sort -r >> trace
 
 run100M: $(TARGET)
-	@date > trace
-	./$(TARGET) -c 100000 -s 1000 >> trace
-	@size -t $(TARGET) $(OBJS) | sort -r >> trace
+#	@date > trace
+	./$(TARGET) -c 100000 -s 1000 
+#	@size -t $(TARGET) $(OBJS) | sort -r >> trace
 
 list : Makefile
 	echo Makefile $(HDRS) $(SRCS) $(DOCS) $(SCRS) > list

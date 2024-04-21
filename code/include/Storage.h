@@ -93,23 +93,24 @@ class Storage {
 class RunManager {
   private:
     std::string baseDir;
-    // std::vector<std::string> runFiles;
-    int nextRunIndex = 0;
+    std::vector<std::pair<std::string, RowCount>> runFiles;
     RowCount _currSize = 0;
     Storage *storage;
 
-    // helpers
+    // next run id
+    int nextRunIndex = 0;
     std::string getNextRunFileName();
 
   public:
     RunManager(Storage *storage);
+    ~RunManager();
 
     // getters
     std::string getBaseDir() { return baseDir; }
     int getNextRunIndex() { return nextRunIndex; }
     RowCount getCurrSizeInRecords() { return _currSize; }
-    std::vector<std::string> getStoredRunsSortedBySize();
-    std::vector<std::string> getStoredRunsInfo();
+    std::vector<std::pair<std::string, RowCount>> &getStoredRunsSortedBySize();
+    std::vector<std::string> getRunInfoFromDir();
 
     // operations
     void storeRun(std::vector<Page *> &pages);
@@ -119,10 +120,6 @@ class RunManager {
 
     // validation
     void validateRun(const std::string &runFilename, int pageSize);
-
-    // print
-    void printRunFiles();
-    void printRunFilesSortedBySize();
 
     char *repr() {
         std::string repr = storage->getName() + "RunManager: ";
@@ -146,7 +143,7 @@ class HDD : public Storage {
     RunManager *runManager;
 
   protected:
-    HDD(std::string name = "HDD", ByteCount capacity = Config::HDD_SIZE,
+    HDD(std::string name = "HDD", ByteCount capacity = Config::HDD_CAPACITY,
         int bandwidth = Config::HDD_BANDWIDTH, double latency = Config::HDD_LATENCY);
 
   public:
@@ -157,10 +154,15 @@ class HDD : public Storage {
         return instance;
     }
 
-    ~HDD();
+    ~HDD() {
+        if (runManager != nullptr) {
+            delete runManager;
+        }
+    }
 
     // getters
     RunManager *getRunManager() { return runManager; }
+    RowCount getEmptySpaceInRecords();
 };
 
 // ==================================================================
@@ -181,9 +183,10 @@ class SSD : public HDD {
         }
         return instance;
     }
-
+    ~SSD() {}
     // getters
     RunManager *getRunManager() { return runManager; }
+    RowCount getEmptySpaceInRecords();
     void spillRunsToHDD(HDD *hdd);
 };
 
