@@ -14,6 +14,9 @@
 #include <sys/stat.h>
 #include <vector>
 
+#define DRAM_NAME "DRAM"
+#define DISK_NAME "HDD"
+#define SSD_NAME "SSD"
 
 // =========================================================
 // ------------------------ RunManager ---------------------
@@ -45,8 +48,8 @@ class RunManager {
     std::vector<std::pair<std::string, RowCount>> &getStoredRunsSortedBySize();
 
     std::string repr() {
-        std::string repr = "\n\t" + baseDir + "RunManager: " + "stored " +
-                           std::to_string(runFiles.size()) + " runs, ";
+        std::string repr =
+            baseDir + "RunManager: " + "stored " + std::to_string(runFiles.size()) + " runs, ";
         return repr;
     }
 }; // class RunManager
@@ -65,8 +68,8 @@ class Storage {
     // ---- calibrable configurations ----
     RowCount PAGE_SIZE_IN_RECORDS = 0; // in records
     PageCount CLUSTER_SIZE = 0;        // in pages
-    int MERGE_FAN_IN = 30;             // #runs to merge at a time, or #input_clusters
-    int MERGE_FAN_OUT = 2;             // #output_clusters
+    int MERGE_FAN_IN = 45;             // #runs to merge at a time, or #input_clusters
+    int MERGE_FAN_OUT = 5;             // #output_clusters
     RowCount MERGE_FANIN_IN_RECORDS;   // total #records to merge at a time per input cluster
     RowCount MERGE_FANOUT_IN_RECORDS;  // total #records that can be stored in output clusters
     // ---- read/write buffer ----
@@ -86,23 +89,19 @@ class Storage {
     RowCount _totalSpaceInInputClusters = 0;  // setup before merging
     RowCount _totalSpaceInOutputClusters = 0; // setup before merging
 
-  public:
-    Storage(std::string name, ByteCount capacity, int bandwidth, double latency);
-
     // setup
+    Storage(std::string name, ByteCount capacity, int bandwidth, double latency);
     void configure();
 
-    // ---- getters ----
+  public:
+    // -------------------------------- getters --------------------------------
+    // configurations
     std::string getName() const { return name; }
-    ByteCount getCapacityInBytes() const { return CAPACITY_IN_BYTES; }
     RowCount getCapacityInRecords() const { return CAPACITY_IN_BYTES / Config::RECORD_SIZE; }
-    ByteCount getPageSizeInBytes() const { return PAGE_SIZE_IN_RECORDS * Config::RECORD_SIZE; }
     RowCount getPageSizeInRecords() const { return PAGE_SIZE_IN_RECORDS; }
-    PageCount getClusterSizeInPages() const { return CLUSTER_SIZE; }
-    int getMergeFanIn() const { return MERGE_FAN_IN; }
-    int getMergeFanOut() const { return MERGE_FAN_OUT; }
     RowCount getMergeFanInRecords() const { return MERGE_FANIN_IN_RECORDS; }
     RowCount getMergeFanOutRecords() const { return MERGE_FANOUT_IN_RECORDS; }
+    // file I/O
     std::string getReadFilePath() const { return readFilePath; }
     std::string getWriteFilePath() const { return writeFilePath; }
     // time calculations in ms
@@ -112,59 +111,17 @@ class Storage {
     int getAccessTimeInMillis(RowCount nRecords) const {
         return (int)(this->getAccessTimeInSec(nRecords) * 1000);
     }
-
-    // ---- state ----
+    // usage details
     RowCount getTotalEmptySpaceInRecords() {
         return getCapacityInRecords() - getTotalFilledSpaceInRecords();
     }
     RowCount getTotalFilledSpaceInRecords() {
         return _filled + _filledInputClusters + _filledOutputClusters;
     }
-    void storeMore(RowCount nRecords) { _filled += nRecords; }
-    void freeMore(RowCount nRecords) { _filled -= nRecords; }
-    void resetAllFilledSpace() {
-        _filled = 0;
-        _filledInputClusters = 0;
-        _filledOutputClusters = 0;
-    }
-    std::string reprUsageDetails() {
-        std::string state = "\n\t" + this->name + " usage details: ";
-        state += "\n\t\t_filled: " + std::to_string(_filled) + " records";
-        state += "\n\t\tinputcluster: " + std::to_string(_filledInputClusters) + " out of " +
-                 std::to_string(_totalSpaceInInputClusters) + " records, ";
-        state += "\n\t\toutputcluster: " + std::to_string(_filledOutputClusters) + " out of " +
-                 std::to_string(_totalSpaceInOutputClusters) + " records";
-        state +=
-            "\n\t\teffective cluster size: " + std::to_string(_effectiveClusterSize) + " records";
-        state +=
-            "\n\t\ttotal filled: " + std::to_string(getTotalFilledSpaceInRecords()) + " records";
-        state += "\n\t\ttotal capacity: " + std::to_string(getCapacityInRecords()) + " records";
-        state += "\n\t\ttotal empty space: " + std::to_string(getTotalEmptySpaceInRecords()) +
-                 " records";
-        state += "\n\t\t" + runManager->repr();
-        return state;
-    }
-    // ---- merging state ----
-    void setupMergingState(RowCount totalInputRecords, RowCount totalOutputRecords,
-                           RowCount effectiveClusterSize) {
-        _totalSpaceInInputClusters = totalInputRecords;
-        _totalSpaceInOutputClusters = totalOutputRecords;
-        _effectiveClusterSize = effectiveClusterSize;
-        _filledInputClusters = 0;
-        _filledOutputClusters = 0;
-    }
-    void fillInputCluster(RowCount nRecords) { _filledInputClusters += nRecords; }
-    void fillOutputCluster(RowCount nRecords) { _filledOutputClusters += nRecords; }
-    void freeInputCluster(RowCount nRecords) { _filledInputClusters -= nRecords; }
-    void freeOutputCluster(RowCount nRecords) { _filledOutputClusters -= nRecords; }
-    void getMergingState(RowCount &filledInputClusters, RowCount &filledOutputClusters) {
-        filledInputClusters = _filledInputClusters;
-        filledOutputClusters = _filledOutputClusters;
-    }
-    void getEmptySpaceInClusters(RowCount &emptyInputClusters, RowCount &emptyOutputClusters) {
-        emptyInputClusters = _totalSpaceInInputClusters - _filledInputClusters;
-        emptyOutputClusters = _totalSpaceInOutputClusters - _filledOutputClusters;
-    }
+    // merging states
+    RowCount getEffectiveClusterSize() { return _effectiveClusterSize; }
+    RowCount getTotalSpaceInInputClusters() { return _totalSpaceInInputClusters; }
+    RowCount getTotalSpaceInOutputClusters() { return _totalSpaceInOutputClusters; }
     RowCount getEmptySpaceInInputClusters() {
         return _totalSpaceInInputClusters - _filledInputClusters;
     }
@@ -173,9 +130,40 @@ class Storage {
     }
     RowCount getFilledSpaceInInputClusters() { return _filledInputClusters; }
     RowCount getFilledSpaceInOutputClusters() { return _filledOutputClusters; }
-    RowCount getFilledSpace() { return _filledInputClusters + _filledOutputClusters; }
 
-    // ---- file operations ----
+
+    // -------------------------------- setters --------------------------------
+    // merging states
+    void storeMore(RowCount nRecords) { _filled += nRecords; }
+    void freeMore(RowCount nRecords) { _filled -= nRecords; }
+    void resetAllFilledSpace() {
+        _filled = 0;
+        _filledInputClusters = 0;
+        _filledOutputClusters = 0;
+    }
+    void setupMergeState(RowCount outputDevicePageSize, int fanIn);
+    void resetMergeState() {
+        _effectiveClusterSize = 0;
+        _filledInputClusters = 0;
+        _filledOutputClusters = 0;
+        _totalSpaceInInputClusters = 0;
+        _totalSpaceInOutputClusters = 0;
+    }
+    /**
+     * @brief Setup merging state for the storage device (used for merging miniruns)
+     * Since, fanIn is not provided, it will use MERGE_FAN_OUT as fanOut
+     * and calculate totalInputClusterSize based on outputDevicePageSize
+     * NOTE: the _effectiveClusterSize will be set to -1, don't use it
+     * @return the fanOut value used
+     */
+    int setupMergeStateForMiniruns(RowCount outputDevicePageSize);
+    void fillInputCluster(RowCount nRecords) { _filledInputClusters += nRecords; }
+    void fillOutputCluster(RowCount nRecords) { _filledOutputClusters += nRecords; }
+    void freeInputCluster(RowCount nRecords) { _filledInputClusters -= nRecords; }
+    void freeOutputCluster(RowCount nRecords) { _filledOutputClusters -= nRecords; }
+
+
+    // ---------------------------- file operations ----------------------------
     bool readFrom(const std::string &filePath);
     bool writeTo(const std::string &filePath);
     std::streampos getReadPosition() { return readFile.tellg(); }
@@ -185,6 +173,13 @@ class Storage {
     // cleanup
     void closeRead();
     void closeWrite();
+
+    // ---------------------------- run management ----------------------------
+    RunWriter *getRunWriter();
+    void closeWriter(RunWriter *writer);
+
+    // ---------------------------- printing -----------------------------------
+    std::string reprUsageDetails();
 
 }; // class Storage
 

@@ -45,9 +45,6 @@ Iterator *ScanPlan::init() const {
 // constructor for scanning the input file
 ScanIterator::ScanIterator(ScanPlan const *const plan) : _plan(plan), _count(0) {
     TRACE(true);
-
-    // this->_hdd = HDD::getInstance();
-
     // skip if the input file already exists
     if (!std::ifstream(plan->_filename.c_str())) {
         // seed random number generator if debug is not defined
@@ -67,26 +64,12 @@ ScanIterator::ScanIterator(ScanPlan const *const plan) : _plan(plan), _count(0) 
         input_file.close();
         traceprintf("generated %lu records\n", (unsigned long)(plan->_count));
         delete[] record;
-
-        // #if defined(_VALIDATE)
-        //         // verify the file size
-        //         std::ifstream inputfile(_plan->_filename, std::ios::binary);
-        //         inputfile.seekg(0, std::ios::end);
-        //         long long file_size = inputfile.tellg();
-        //         long long expected = plan->_count * Config::RECORD_SIZE;
-        //         printv("VALIDATE: file size %lld == expected %lld\n", file_size, expected);
-        //         assert(file_size == expected && "file size mismatch");
-        //         inputfile.close();
-        // #endif
     }
-
+    // NOTE: did not update HDD usage value since its capacity is infinite
     printv("INFO: input filename: '%s'\n", _plan->_filename.c_str());
     printv("\tinput file size %llu bytes / %llu MB / %llu GB\n", getInputSizeInBytes(),
            BYTE_TO_MB(getInputSizeInBytes()), BYTE_TO_GB(getInputSizeInBytes()));
     printv("\tinput file has %llu records\n", _plan->_count);
-
-    // this->_file.open(_plan->_filename, std::ios::binary);
-    // this->_file.seekg(0, std::ios::beg);
 
 } // ScanIterator::ScanIterator
 

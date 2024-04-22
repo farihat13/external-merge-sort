@@ -189,19 +189,28 @@ RowCount RunWriter::writeNextPage(Page *page) {
         throw std::runtime_error("Error: Writing " + std::to_string(nRecords) +
                                  " records, expected " + std::to_string(page->getSizeInRecords()));
     }
+    currSize += nRecords;
     return nRecords;
 }
 
 RowCount RunWriter::writeNextRun(Run &run) {
-    Record *rec = run.getHead();
-    RowCount nRecords = 0;
-    while (rec != nullptr) {
-        os.write(rec->data, Config::RECORD_SIZE);
-        if (!os) {
-            throw std::runtime_error("Error: Writing to file");
-        }
-        nRecords++;
-        rec = rec->next;
+    char *data = run.getAllData();
+    RowCount nRecords = run.getSize();
+    os.write(data, nRecords * Config::RECORD_SIZE);
+    if (!os) {
+        throw std::runtime_error("Error: Writing to file");
     }
+    currSize += nRecords;
+    delete[] data;
+    // Record *rec = run.getHead();
+    // RowCount nRecords = 0;
+    // while (rec != nullptr) {
+    //     os.write(rec->data, Config::RECORD_SIZE);
+    //     if (!os) {
+    //         throw std::runtime_error("Error: Writing to file");
+    //     }
+    //     nRecords++;
+    //     rec = rec->next;
+    // }
     return nRecords;
 }

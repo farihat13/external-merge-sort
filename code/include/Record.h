@@ -77,6 +77,16 @@ class Run {
     Record *getHead() { return runHead; }
     RowCount getSize() { return size; }
 
+    char *getAllData() {
+        char *buffer = new char[size * Config::RECORD_SIZE];
+        Record *curr = runHead;
+        for (int i = 0; i < size; i++) {
+            std::memcpy(buffer + i * Config::RECORD_SIZE, curr->data, Config::RECORD_SIZE);
+            curr = curr->next;
+        }
+        return buffer;
+    }
+
     // print
     void printRun() {
         Record *curr = runHead;
@@ -153,8 +163,6 @@ class Page {
     // validation
     bool isSorted() const;
     bool isValid() const;
-
-    friend class RunWriter;
 }; // class Page
 
 
@@ -203,25 +211,40 @@ class RunReader {
 
 class RunWriter {
   private:
+    std::string filename;
     std::ofstream os;
+    // ---- internal state ----
+    RowCount currSize = 0;
 
   public:
-    RunWriter(const std::string &filename) : os(filename, std::ios::binary | std::ios::trunc) {
+    RunWriter(const std::string &filename)
+        : filename(filename), os(filename, std::ios::binary | std::ios::trunc) {
         if (!os) {
             throw std::runtime_error("Cannot open file: " + filename);
         }
-        // printvv("DEBUG: RunWriter opened '%s'\n", filename.c_str());
+        printv("\t\t\tDEBUG: RunWriter opened '%s'\n", filename.c_str());
     }
 
     ~RunWriter() {
         if (os.is_open()) {
             os.close();
         }
+        printv("\t\t\tDEBUG: RunWriter destroyed '%s'\n", filename.c_str());
     }
 
     RowCount writeNextPage(Page *page);
     // RowCount writeNextPages(std::vector<Page *> &pages);
     RowCount writeNextRun(Run &run);
+
+    // ---- getters ----
+    std::string getFilename() { return filename; }
+    RowCount getCurrSize() { return currSize; }
+    void close() {
+        if (os.is_open()) {
+            os.close();
+        }
+        printv("\t\t\tDEBUG: RunWriter closed '%s'\n", filename.c_str());
+    }
 }; // class RunWriter
 
 
