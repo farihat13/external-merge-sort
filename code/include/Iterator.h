@@ -3,6 +3,7 @@
 
 #include "Record.h"
 #include "Storage.h"
+#include "StorageTypes.h"
 #include "config.h"
 #include "defs.h"
 
