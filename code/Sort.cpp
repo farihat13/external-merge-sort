@@ -101,7 +101,7 @@ void SortIterator::firstPass() {
         // if (_ssdCurrSize + nRecordsNext > _ssdCapacity) { // TODO:
         if (_ssdCurrSize + nRecordsNext > _ssd->getMergeFanInRecords()) {
             // spill some runs to HDD
-            _ssd->spillRunsToHDD(_hdd);
+            _ssd->mergeRuns(_hdd);
         }
 
         // 1. Read records from input file to DRAM

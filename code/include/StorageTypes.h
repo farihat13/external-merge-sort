@@ -49,7 +49,7 @@ class SSD : public HDD {
         return instance;
     }
     ~SSD() {}
-    void spillRunsToHDD(HDD *hdd);
+    void mergeRuns(HDD *outputDevice);
 };
 
 // ==================================================================

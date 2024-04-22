@@ -148,12 +148,32 @@ RunWriter *Storage::getRunWriter() {
 
 RowCount Storage::writeNextChunk(RunWriter *writer, Run &run) {
     RowCount _empty = this->getTotalEmptySpaceInRecords();
-    if (writer->getCurrSize() >= _empty) {
-        // TODO: spill some runs to HDD
-        printvv("WARNING: %s is full, spill some runs to HDD\n", this->name.c_str());
-        // return 0;
+    if (run.getSize() > _empty) {
+        if (this->spillTo == nullptr) {
+            printvv("ERROR: %s is full, no spillTo device\n", this->name.c_str());
+            throw std::runtime_error("Error: Storage is full, no spillTo device");
+        }
+        if (spillWriter == nullptr) {
+            spillWriter = startSpillSession();
+        }
+        // close the current file
+        writer->close();
+        // copy the file content to spillWriter
+        RowCount nRecord = spillWriter->writeFromFile(writer->getFilename(), writer->getCurrSize());
+        spillTo->fillupSpace(nRecord);
+        // reset the filesize to 0
+        writer->reset();
+        // update the storage usage (free up the space in this storage)
+        _filled -= nRecord;
+        printv("STATE -> %s is full, spilled to %s\n", this->name.c_str(), spillTo->name.c_str());
+        printv("ACCESS -> A write to %s was made with size %llu bytes and latency %d ms\n",
+               spillTo->getName().c_str(), nRecord * Config::RECORD_SIZE,
+               spillTo->getAccessTimeInMillis(nRecord));
+        flushv();
     }
+    /** assumption: spilling the current file to disk will free up enough space */
     RowCount nRecord = writer->writeNextRun(run);
+    _filled += nRecord;
     return nRecord;
 }
 
@@ -161,11 +181,28 @@ void Storage::closeWriter(RunWriter *writer) {
     // this->addRunFile(writer->getFilename(), writer->getSize());
     RowCount nRecords = writer->getCurrSize();
     runManager->addRunFile(writer->getFilename(), nRecords);
-    _filled += nRecords;
+    // _filled += nRecords;
     writer->close();
     delete writer;
+    if (spillWriter != nullptr) {
+        endSpillSession();
+    }
 }
 
+
+RunWriter *Storage::startSpillSession() {
+    spillWriter = spillTo->getRunWriter();
+    return spillWriter;
+}
+
+void Storage::endSpillSession() {
+    printvv("INFO: Spill writer wrote %lld records\n", spillWriter->getCurrSize());
+    if (spillWriter != nullptr) {
+        spillWriter->close();
+        delete spillWriter;
+        spillWriter = nullptr;
+    }
+}
 
 // ------------------------------- Merging state -------------------------------
 
@@ -310,6 +347,46 @@ RowCount RunStreamer::readAheadPages(int nPages) {
            fromDevice->getAccessTimeInMillis(nRecords));
     return nRecords;
 }
+// RowCount RunStreamer::readAheadPages(int nPages) {
+//     RowCount nRecords = 0;
+//     currentPage = reader->readNextPage();
+//     bool closeReader = false;
+//     if (currentPage == nullptr) { // if no page is read, close the reader
+//         closeReader = true;
+//     } else {
+//         nRecords += currentPage->getSizeInRecords();
+//         Page *page = currentPage;
+//         for (int i = 0; i < nPages; i++) {
+//             Page *p = reader->readNextPage();
+//             if (p == nullptr) {
+//                 closeReader = true; // if no more pages to read, close the reader
+//                 break;
+//             }
+//             nRecords += p->getSizeInRecords();
+//             page->addNextPage(p);
+//             page = p;
+//         }
+//         toDevice->fillInputCluster(nRecords);
+//         printv("\tSTATE -> Read %lld records from %s\n", nRecords,
+//         reader->getFilename().c_str()); printv("\tACCESS -> A read from %s was made with size
+//         %llu bytes and latency %d ms\n",
+//                fromDevice->getName().c_str(), nRecords * Config::RECORD_SIZE,
+//                fromDevice->getAccessTimeInMillis(nRecords));
+//     }
+//     flushv();
+//     if (closeReader) {
+//         reader->close();
+//         fromDevice->freeSome(reader->getFilesize());
+//         printv("\t\t\tRunReader freed %lld bytes from %s, left %lld records\n",
+//                reader->getFilesize(), fromDevice->getName().c_str(),
+//                fromDevice->getTotalFilledSpaceInRecords());
+//         // if (deleteReader)
+//         //     reader->deleteFile();
+
+//         delete reader;
+//     }
+//     return nRecords;
+// }
 
 Record *RunStreamer::moveNext() {
     // if reader does not exist

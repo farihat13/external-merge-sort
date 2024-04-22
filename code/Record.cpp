@@ -193,6 +193,32 @@ RowCount RunWriter::writeNextPage(Page *page) {
     return nRecords;
 }
 
+RowCount RunWriter::writeFromFile(std::string filename, RowCount toCopyNRecords) {
+    std::ifstream is(filename, std::ios::binary);
+    if (!is) {
+        throw std::runtime_error("Error: Opening file " + filename);
+    }
+    ByteCount bufSize = ROUNDUP(1024 * 1024, Config::RECORD_SIZE);
+    char *buffer = new char[bufSize];
+    ByteCount total = 0;
+    while (is) {
+        is.read(buffer, bufSize);
+        ByteCount n = is.gcount();
+        os.write(buffer, n);
+        total += n;
+    }
+    delete[] buffer;
+    if (!os) {
+        throw std::runtime_error("Error: Writing to file");
+    }
+    RowCount nRecords = total / Config::RECORD_SIZE;
+    currSize += nRecords;
+    printvv("DEBUG: Copied %llu out of %llu records from %s\n", nRecords, toCopyNRecords,
+            filename.c_str());
+    assert(toCopyNRecords == nRecords);
+    return nRecords;
+}
+
 RowCount RunWriter::writeNextRun(Run &run) {
     char *data = run.getAllData();
     RowCount nRecords = run.getSize();
@@ -202,15 +228,5 @@ RowCount RunWriter::writeNextRun(Run &run) {
     }
     currSize += nRecords;
     delete[] data;
-    // Record *rec = run.getHead();
-    // RowCount nRecords = 0;
-    // while (rec != nullptr) {
-    //     os.write(rec->data, Config::RECORD_SIZE);
-    //     if (!os) {
-    //         throw std::runtime_error("Error: Writing to file");
-    //     }
-    //     nRecords++;
-    //     rec = rec->next;
-    // }
     return nRecords;
 }
