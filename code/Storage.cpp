@@ -158,51 +158,6 @@ void Storage::closeWriter(RunWriter *writer) {
 // ------------------------------- Merging state -------------------------------
 
 
-void Storage::setupMergeState(RowCount outputDevicePageSize, int fanIn) {
-    _totalSpaceInOutputClusters = MERGE_FAN_OUT * outputDevicePageSize;
-    _totalSpaceInInputClusters = ROUNDDOWN(
-        getTotalEmptySpaceInRecords() - _totalSpaceInOutputClusters, outputDevicePageSize);
-    _effectiveClusterSize = _totalSpaceInInputClusters / fanIn;
-    if (_effectiveClusterSize < outputDevicePageSize) {
-        printvv("ERROR: effective cluster size %lld < output device page size %lld\n",
-                _effectiveClusterSize, outputDevicePageSize);
-        throw std::runtime_error("Error: effective cluster size < output device page size"
-                                 " in storage setup");
-    }
-    PageCount clusSize = _effectiveClusterSize / outputDevicePageSize;
-    _totalSpaceInInputClusters = clusSize * fanIn * outputDevicePageSize;
-    _totalSpaceInOutputClusters =
-        ROUNDDOWN(getTotalEmptySpaceInRecords() - _totalSpaceInInputClusters, outputDevicePageSize);
-    _filledInputClusters = 0;
-    _filledOutputClusters = 0;
-}
-
-/**
- * @brief Setup merging state for the storage device (used for merging miniruns)
- * Since, fanIn is not provided, it will use MERGE_FAN_OUT as fanOut
- * and calculate totalInputClusterSize based on outputDevicePageSize
- * NOTE: the _effectiveClusterSize will be set to -1, don't use it
- * @return the fanOut value used
- */
-int Storage::setupMergeStateForMiniruns(RowCount outputDevicePageSize) {
-    if (this->name != DRAM_NAME) {
-        printvv("ERROR: setupMergeStateForMiniruns is only for DRAM\n");
-        throw std::runtime_error("Error: setupMergeStateForMiniruns is only for DRAM");
-    }
-    // NOTE: don't use getTotalEmptySpaceInRecords() here, since the dram is already filled
-    _totalSpaceInOutputClusters =
-        ROUNDUP(CLUSTER_SIZE * this->PAGE_SIZE_IN_RECORDS, outputDevicePageSize);
-    _totalSpaceInInputClusters =
-        ROUNDDOWN(getCapacityInRecords() - _totalSpaceInOutputClusters, outputDevicePageSize);
-    _totalSpaceInOutputClusters =
-        ROUNDDOWN(getCapacityInRecords() - _totalSpaceInInputClusters, outputDevicePageSize);
-    _effectiveClusterSize = _totalSpaceInOutputClusters / MERGE_FAN_OUT;
-    _filledInputClusters = 0;
-    _filledOutputClusters = 0;
-    return MERGE_FAN_OUT;
-}
-
-
 // --------------------------------- File IO -----------------------------------
 
 

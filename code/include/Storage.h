@@ -101,6 +101,9 @@ class Storage {
     RowCount getPageSizeInRecords() const { return PAGE_SIZE_IN_RECORDS; }
     RowCount getMergeFanInRecords() const { return MERGE_FANIN_IN_RECORDS; }
     RowCount getMergeFanOutRecords() const { return MERGE_FANOUT_IN_RECORDS; }
+    int getMergeFanIn() const { return MERGE_FAN_IN; }
+    int getMergeFanOut() const { return MERGE_FAN_OUT; }
+    PageCount getClusterSize() const { return CLUSTER_SIZE; }
     // file I/O
     std::string getReadFilePath() const { return readFilePath; }
     std::string getWriteFilePath() const { return writeFilePath; }
@@ -141,7 +144,7 @@ class Storage {
         _filledInputClusters = 0;
         _filledOutputClusters = 0;
     }
-    void setupMergeState(RowCount outputDevicePageSize, int fanIn);
+    virtual void setupMergeState(RowCount outputDevicePageSize, int fanIn) = 0;
     void resetMergeState() {
         _effectiveClusterSize = 0;
         _filledInputClusters = 0;
@@ -156,7 +159,7 @@ class Storage {
      * NOTE: the _effectiveClusterSize will be set to -1, don't use it
      * @return the fanOut value used
      */
-    int setupMergeStateForMiniruns(RowCount outputDevicePageSize);
+    virtual int setupMergeStateForMiniruns(RowCount outputDevicePageSize) = 0;
     void fillInputCluster(RowCount nRecords) { _filledInputClusters += nRecords; }
     void fillOutputCluster(RowCount nRecords) { _filledOutputClusters += nRecords; }
     void freeInputCluster(RowCount nRecords) { _filledInputClusters -= nRecords; }

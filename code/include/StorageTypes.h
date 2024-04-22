@@ -25,6 +25,9 @@ class HDD : public Storage {
             delete runManager;
         }
     }
+
+    void setupMergeState(RowCount outputDevicePageSize, int fanIn);
+    int setupMergeStateForMiniruns(RowCount outputDevicePageSize);
     RowCount storeRun(Run &run);
 };
 
@@ -75,6 +78,9 @@ class DRAM : public Storage {
 
     ~DRAM() { // delete[] buffer;
     }
+    void setupMergeState(RowCount outputDevicePageSize, int fanIn);
+    int setupMergeStateForMiniruns(RowCount outputDevicePageSize);
+
     void reset() {
         _head = nullptr;
         _miniruns.clear();
