@@ -105,22 +105,21 @@ void SortIterator::firstPass() {
         }
 
         // 1. Read records from input file to DRAM
-        _dram->reset();
         RowCount nRecords = this->loadInputToDRAM();
         if (nRecords == 0) {
             printvv("WARNING: no records read\n");
             break;
         }
         _consumed += nRecords;
-        printvv("DEBUG: consumed %llu records, current file position %llu\n", _consumed,
+        printvv("DEBUG: consumed %llu out of %llu records in input, input file position %llu\n",
+                _consumed, Config::NUM_RECORDS - _consumed,
                 _hdd->getReadPosition() / Config::RECORD_SIZE);
         printv("after loading input: %s\n",
                _dram->reprUsageDetails().c_str()); // print dram state
 
         // 2. Sort records in DRAM
-        _dram->genMiniRuns(nRecords);
-        _dram->mergeMiniRuns(_ssd);
-        printvv("DEBUG: After merging miniruns: %s\n", _ssd->reprStoredRuns().c_str());
+        _dram->genMiniRuns(nRecords); // this should sort records in dram and create miniruns
+        _dram->mergeMiniRuns(_ssd);   // this should spill runs to SSD and reset dram
         printv("%s\n", _ssd->reprUsageDetails().c_str());  // print ssd state
         printv("%s\n", _dram->reprUsageDetails().c_str()); // print dram state
     }

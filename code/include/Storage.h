@@ -16,6 +16,43 @@
 
 
 // =========================================================
+// ------------------------ RunManager ---------------------
+// =========================================================
+
+class RunManager {
+  private:
+    std::string baseDir;
+    std::vector<std::pair<std::string, RowCount>> runFiles;
+    int nextRunIndex = 0; // next run id
+    RowCount totalRecords = 0;
+
+    std::vector<std::string> getRunInfoFromDir();
+
+  public:
+    RunManager(std::string deviceName);
+    ~RunManager();
+
+    // setters
+    void addRunFile(std::string filename, RowCount nRecords) {
+        runFiles.push_back({filename, nRecords});
+        totalRecords += nRecords;
+    }
+
+    // getters
+    std::string getBaseDir() { return baseDir; }
+    RowCount getTotalRecords() { return totalRecords; }
+    std::string getNextRunFileName();
+    std::vector<std::pair<std::string, RowCount>> &getStoredRunsSortedBySize();
+
+    std::string repr() {
+        std::string repr = "\n\t" + baseDir + "RunManager: " + "stored " +
+                           std::to_string(runFiles.size()) + " runs, ";
+        return repr;
+    }
+}; // class RunManager
+
+
+// =========================================================
 //  -------------------------- Storage ---------------------
 // =========================================================
 
@@ -38,6 +75,8 @@ class Storage {
     std::ofstream writeFile;
 
   protected:
+    // run manager
+    RunManager *runManager; // only for HDD and SSD
     // ---- internal state ----
     RowCount _filled = 0; // updated by RunManager
     // used for merging
@@ -97,9 +136,12 @@ class Storage {
                  std::to_string(_totalSpaceInOutputClusters) + " records";
         state +=
             "\n\t\teffective cluster size: " + std::to_string(_effectiveClusterSize) + " records";
-        RowCount totalFilled = _filledInputClusters + _filledOutputClusters + _filled;
-        state += "\n\t\ttotal filled: " + std::to_string(totalFilled) + " records";
+        state +=
+            "\n\t\ttotal filled: " + std::to_string(getTotalFilledSpaceInRecords()) + " records";
         state += "\n\t\ttotal capacity: " + std::to_string(getCapacityInRecords()) + " records";
+        state += "\n\t\ttotal empty space: " + std::to_string(getTotalEmptySpaceInRecords()) +
+                 " records";
+        state += "\n\t\t" + runManager->repr();
         return state;
     }
     // ---- merging state ----
@@ -143,51 +185,8 @@ class Storage {
     // cleanup
     void closeRead();
     void closeWrite();
-};
 
-
-// =========================================================
-// ------------------------ RunManager ---------------------
-// =========================================================
-
-class RunManager {
-  private:
-    std::string baseDir;
-    std::vector<std::pair<std::string, RowCount>> runFiles;
-    RowCount _currSize = 0;
-    Storage *storage;
-
-    // next run id
-    int nextRunIndex = 0;
-    std::string getNextRunFileName();
-
-  public:
-    RunManager(Storage *storage);
-    ~RunManager();
-
-    // getters
-    std::string getBaseDir() { return baseDir; }
-    int getNextRunIndex() { return nextRunIndex; }
-    RowCount getCurrSizeInRecords() { return _currSize; }
-    std::vector<std::pair<std::string, RowCount>> &getStoredRunsSortedBySize();
-    std::vector<std::string> getRunInfoFromDir();
-
-    // operations
-    RowCount storeRun(Run &run);
-    // void storeRun(std::vector<Page *> &pages);
-    // std::vector<Page *> loadRun(const std::string &runFilename, int pageSize);
-    // void validateRun(const std::string &runFilename, int pageSize);
-    // void deleteRun(const std::string &runFilename);
-
-    char *repr() {
-        std::string repr = storage->getName() + "RunManager: ";
-        repr += "dir: " + baseDir + ", ";
-        repr += "stored " + std::to_string(nextRunIndex) + " runs, ";
-        repr += "used space: " + std::to_string(_currSize) + " out of " +
-                std::to_string(storage->getCapacityInRecords()) + " records";
-        return strdup(repr.c_str());
-    }
-};
+}; // class Storage
 
 
 // =========================================================
@@ -240,7 +239,6 @@ class RunStreamer {
 class HDD : public Storage {
   private:
     static HDD *instance;
-    RunManager *runManager;
 
   protected:
     HDD(std::string name = "HDD", ByteCount capacity = Config::HDD_CAPACITY,
@@ -260,18 +258,24 @@ class HDD : public Storage {
         }
     }
 
-    void storeRun(Run &run) {
+    RowCount storeRun(Run &run) {
         if (getTotalEmptySpaceInRecords() < run.getSize()) {
+            printvv("ERROR: Run size %lld exceeds storage empty space\n", run.getSize());
+            printvv("%s\n", reprUsageDetails().c_str());
             throw std::runtime_error(this->getName() + " is full, cannot store run");
         }
-        RowCount nRecords = runManager->storeRun(run);
-        this->storeMore(nRecords);
+        std::string filename = runManager->getNextRunFileName();
+        RunWriter writer(filename);
+        RowCount nRecords = writer.writeNextRun(run);
+        if (nRecords != run.getSize()) {
+            printvv("ERROR: Writing %lld records, expected %lld\n", nRecords, run.getSize());
+            throw std::runtime_error("Error: Writing run to file");
+        }
+        runManager->addRunFile(filename, nRecords);
+        _filled += nRecords;
+        // this->storeMore(nRecords);
+        return nRecords;
     }
-
-
-    // getters
-    // RunManager *getRunManager() { return runManager; }
-    std::string reprStoredRuns() { return runManager->repr(); }
 };
 
 // ==================================================================
@@ -282,7 +286,6 @@ class SSD : public HDD {
 
   private:
     static SSD *instance;
-    RunManager *runManager;
     SSD();
 
   public:
@@ -293,8 +296,6 @@ class SSD : public HDD {
         return instance;
     }
     ~SSD() {}
-    // getters
-    // RunManager *getRunManager() { return runManager; }
     void spillRunsToHDD(HDD *hdd);
 };
 
@@ -309,9 +310,7 @@ class DRAM : public Storage {
     static DRAM *instance;
 
     // ---- internal state for generating mini-runs ----
-    RowCount _cacheSize;
-    Record *_head; // linked list of Records for loading records
-    Record *_tail;
+    Record *_head;              // linked list of Records for loading records
     std::vector<Run> _miniruns; // Current runs in DRAM
 
     DRAM();
@@ -328,7 +327,6 @@ class DRAM : public Storage {
     }
     void reset() {
         _head = nullptr;
-        _tail = nullptr;
         _miniruns.clear();
         this->resetAllFilledSpace();
     }

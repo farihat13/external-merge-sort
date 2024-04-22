@@ -5,6 +5,91 @@
 
 
 // =========================================================
+// ------------------------ RunManager ---------------------
+// =========================================================
+
+
+RunManager::RunManager(std::string deviceName) {
+    baseDir = deviceName + "_runs";
+    nextRunIndex = 0;
+    runFiles.clear();
+
+    struct stat st = {0};
+    if (stat(baseDir.c_str(), &st) == -1) {
+        // if the directory does not exist, create it
+        mkdir(baseDir.c_str(), 0700);
+    } else {
+        // if the dir exits, delete all run files in the directory
+        int counter = 0;
+        DIR *dir = opendir(baseDir.c_str());
+        if (dir) {
+            struct dirent *entry;
+            while ((entry = readdir(dir)) != nullptr) {
+                struct stat path_stat;
+                std::string filePath = baseDir + "/" + entry->d_name;
+                stat(filePath.c_str(), &path_stat);
+                if (S_ISREG(path_stat.st_mode)) {
+                    std::remove(filePath.c_str());
+                    counter++;
+                }
+            }
+            closedir(dir);
+        }
+        if (counter > 0) {
+            printvv("WARNING: Deleted %d run files in %s\n", counter, baseDir.c_str());
+        }
+    }
+    printv("\tINFO: RunManager initialized for %s\n", deviceName.c_str());
+}
+
+RunManager::~RunManager() {
+    // give a warning if there are any run files left
+    if (getRunInfoFromDir().size() > 0) {
+        printvv("WARNING: %d run files left in %s\n", runFiles.size(), baseDir.c_str());
+    }
+}
+
+
+std::string RunManager::getNextRunFileName() {
+    struct stat st = {0};
+    if (stat(baseDir.c_str(), &st) == -1) {
+        mkdir(baseDir.c_str(), 0777);
+    }
+    std::string filename = baseDir + "/r" + std::to_string(nextRunIndex++) + ".txt";
+    return filename;
+}
+
+
+// validatations
+std::vector<std::string> RunManager::getRunInfoFromDir() {
+    std::vector<std::string> runFiles;
+    DIR *dir = opendir(baseDir.c_str());
+    if (dir) {
+        struct dirent *entry;
+        while ((entry = readdir(dir)) != nullptr) {
+            struct stat path_stat;
+            std::string filePath = baseDir + "/" + entry->d_name;
+            stat(filePath.c_str(), &path_stat);
+            if (S_ISREG(path_stat.st_mode)) {
+                runFiles.push_back(entry->d_name);
+            }
+        }
+        closedir(dir);
+    }
+    std::sort(runFiles.begin(), runFiles.end());
+    return runFiles;
+}
+
+//
+std::vector<std::pair<std::string, RowCount>> &RunManager::getStoredRunsSortedBySize() {
+    std::sort(runFiles.begin(), runFiles.end(),
+              [&](const std::pair<std::string, RowCount> &a,
+                  const std::pair<std::string, RowCount> &b) { return a.second < b.second; });
+    return runFiles;
+}
+
+
+// =========================================================
 // -------------------------- Storage ----------------------
 // =========================================================
 
@@ -21,6 +106,7 @@ Storage::Storage(std::string name, ByteCount capacity, int bandwidth, double lat
     printv("\tBandwidth %d MB/s, Latency %3.1lf ms\n", BYTE_TO_MB(BANDWIDTH), SEC_TO_MS(LATENCY));
 
     this->configure();
+    this->runManager = new RunManager(this->name);
 }
 
 void Storage::configure() {
@@ -42,13 +128,14 @@ void Storage::configure() {
     this->MERGE_FANOUT_IN_RECORDS = getCapacityInRecords() - this->MERGE_FANIN_IN_RECORDS;
 
     // print the configurations
-    printv("INFO: Configured %s\n", this->name.c_str());
-    printv("\tPage %s\n", getSizeDetails(this->PAGE_SIZE_IN_RECORDS * Config::RECORD_SIZE).c_str());
-    printv("\tCluster Size: %d pages / %s\n", this->CLUSTER_SIZE,
+    printv("\tINFO: Configured %s\n", this->name.c_str());
+    printv("\t\tPage %s\n",
+           getSizeDetails(this->PAGE_SIZE_IN_RECORDS * Config::RECORD_SIZE).c_str());
+    printv("\t\tCluster Size: %d pages / %s\n", this->CLUSTER_SIZE,
            getSizeDetails(this->CLUSTER_SIZE * this->PAGE_SIZE_IN_RECORDS * Config::RECORD_SIZE)
                .c_str());
-    printv("\t_mergeFanIn: %llu records\n", this->MERGE_FANIN_IN_RECORDS);
-    printv("\t_mergeFanOut: %llu records\n", this->MERGE_FANOUT_IN_RECORDS);
+    printv("\t\t_mergeFanIn: %llu records\n", this->MERGE_FANIN_IN_RECORDS);
+    printv("\t\t_mergeFanOut: %llu records\n", this->MERGE_FANOUT_IN_RECORDS);
 }
 
 
@@ -115,110 +202,6 @@ void Storage::closeRead() {
 void Storage::closeWrite() {
     if (writeFile.is_open())
         writeFile.close();
-}
-
-
-// =========================================================
-// ------------------------ RunManager ---------------------
-// =========================================================
-
-
-RunManager::RunManager(Storage *storage) : storage(storage) {
-    baseDir = storage->getName() + "_runs";
-    struct stat st = {0};
-
-    if (stat(baseDir.c_str(), &st) == -1) {
-        // if the directory does not exist, create it
-        mkdir(baseDir.c_str(), 0700);
-    } else {
-        // if the dir exits, delete all run files in the directory
-        int counter = 0;
-        DIR *dir = opendir(baseDir.c_str());
-        if (dir) {
-            struct dirent *entry;
-            while ((entry = readdir(dir)) != nullptr) {
-                struct stat path_stat;
-                std::string filePath = baseDir + "/" + entry->d_name;
-                stat(filePath.c_str(), &path_stat);
-                if (S_ISREG(path_stat.st_mode)) {
-                    std::remove(filePath.c_str());
-                    counter++;
-                }
-            }
-            closedir(dir);
-        }
-        if (counter > 0) {
-            printvv("WARNING: Deleted %d run files in %s\n", counter, baseDir.c_str());
-        }
-    }
-}
-
-RunManager::~RunManager() {
-    // give a warning if there are any run files left
-    if (getRunInfoFromDir().size() > 0) {
-        printvv("WARNING: %d run files left in %s\n", runFiles.size(), baseDir.c_str());
-    }
-}
-
-
-std::string RunManager::getNextRunFileName() {
-    baseDir = storage->getName() + "_runs";
-    struct stat st = {0};
-    if (stat(baseDir.c_str(), &st) == -1) {
-        mkdir(baseDir.c_str(), 0777);
-    }
-    std::string filename = baseDir + "/r" + std::to_string(nextRunIndex++) + ".txt";
-    return filename;
-}
-
-
-// validatations
-std::vector<std::string> RunManager::getRunInfoFromDir() {
-    std::vector<std::string> runFiles;
-    DIR *dir = opendir(baseDir.c_str());
-    if (dir) {
-        struct dirent *entry;
-        while ((entry = readdir(dir)) != nullptr) {
-            struct stat path_stat;
-            std::string filePath = baseDir + "/" + entry->d_name;
-            stat(filePath.c_str(), &path_stat);
-            if (S_ISREG(path_stat.st_mode)) {
-                runFiles.push_back(entry->d_name);
-            }
-        }
-        closedir(dir);
-    }
-    std::sort(runFiles.begin(), runFiles.end());
-    return runFiles;
-}
-
-//
-std::vector<std::pair<std::string, RowCount>> &RunManager::getStoredRunsSortedBySize() {
-    std::sort(runFiles.begin(), runFiles.end(),
-              [&](const std::pair<std::string, RowCount> &a,
-                  const std::pair<std::string, RowCount> &b) { return a.second < b.second; });
-    return runFiles;
-}
-
-// ----------------------- operations ----------------------
-
-RowCount RunManager::storeRun(Run &run) {
-    if (_currSize + run.getSize() > storage->getCapacityInRecords()) {
-        printvv("ERROR: Run size %lld exceeds storage capacity %lld\n", run.getSize(),
-                storage->getCapacityInRecords());
-        throw std::runtime_error("Run size exceeds storage capacity");
-    }
-    std::string filename = getNextRunFileName();
-    RunWriter writer(filename);
-    RowCount nRecords = writer.writeNextRun(run);
-    if (nRecords != run.getSize()) {
-        printvv("ERROR: Writing %lld records, expected %lld\n", nRecords, run.getSize());
-        throw std::runtime_error("Error: Writing run to file");
-    }
-    _currSize += nRecords;
-    runFiles.push_back({filename, nRecords});
-    return nRecords;
-    // TODO: free Records after writing
 }
 
 
@@ -324,9 +307,7 @@ HDD *HDD::instance = nullptr;
 
 
 HDD::HDD(std::string name, ByteCount capacity, int bandwidth, double latency)
-    : Storage(name, capacity, bandwidth, latency) {
-    this->runManager = new RunManager(this);
-}
+    : Storage(name, capacity, bandwidth, latency) {}
 
 
 // =========================================================
@@ -335,45 +316,8 @@ HDD::HDD(std::string name, ByteCount capacity, int bandwidth, double latency)
 
 SSD *SSD::instance = nullptr;
 
-SSD::SSD() : HDD("SSD", Config::SSD_CAPACITY, Config::SSD_BANDWIDTH, Config::SSD_LATENCY) {
-    this->runManager = new RunManager(this);
-}
+SSD::SSD() : HDD("SSD", Config::SSD_CAPACITY, Config::SSD_BANDWIDTH, Config::SSD_LATENCY) {}
 
-// void spillHelper(Storage *storage, RunManager *runManager, RunStreamer *runStreamer,
-//                  int mergeFanIn) {
-//     // 1. spill the runs that don't fit in _mergeFanInRec to SSD
-//     RowCount keepNRecords = 0;
-//     int i = 0;
-//     for (; i < runStreamer->getRunSize(); i++) {
-//         int size = runStreamer->getRunSize();
-//         if (keepNRecords + size < storage->getMergeFanInRecords()) {
-//             keepNRecords += size;
-//         } else {
-//             break;
-//         }
-//     }
-
-//     if (i < runStreamer->getRunSize()) {
-//         printv("DEBUG: spill %d runs out of %d to SSDs\n", runStreamer->getRunSize() - i,
-//                runStreamer->getRunSize());
-//         printv("\t\tspill from %dth runs to SSD\n", i);
-//         int spillNRecords = 0;
-//         int j;
-//         for (j = i; j < runStreamer->getRunSize(); j++) {
-//             spillNRecords += runStreamer->getRunSize();
-//             runManager->storeRun(runStreamer->getRun(j));
-//             printv("\t\tSpilled run %d to SSD\n", j);
-//             flushv();
-//         }
-//         runStreamer->eraseRun(j, runStreamer->getRunSize());
-//         printv("DEBUG: STATE -> %d runs spilled to SSD\n", j - i);
-//         printv("ACCESS -> A write from RAM to SSD was made with size %llu bytes and latency %d "
-//                "ms\n",
-//                spillNRecords * Config::RECORD_SIZE,
-//                storage->getAccessTimeInMillis(keepNRecords));
-//     } else {
-//         printv("DEBUG: All runs fit in DRAM\n");
-//     }
 
 void getConstants(SSD *ssd, RowCount &ssdPageSize, RowCount &hddPageSize, RowCount &ssdCapacity,
                   RowCount &ssdEmptySpace, RowCount &dramCapacity) {
@@ -393,23 +337,32 @@ void getConstants(SSD *ssd, RowCount &ssdPageSize, RowCount &hddPageSize, RowCou
 
 void SSD::spillRunsToHDD(HDD *hdd) {
     TRACE(true);
-    // validate the total runsize does not exceed merge fan-in
-    RowCount allRunTotalSize = runManager->getCurrSizeInRecords();
-    if (allRunTotalSize > getMergeFanInRecords()) {
-        printvv("ERROR: Run size %lld exceeds merge fan-in %lld\n", allRunTotalSize,
-                getMergeFanInRecords());
-        throw std::runtime_error("Run size exceeds merge fan-in");
-    }
 
-    // get the run files sorted by size
-    std::vector<std::pair<std::string, RowCount>> runFiles =
-        runManager->getStoredRunsSortedBySize();
+    Storage *_dram = DRAM::getInstance();
+    Storage *_ssd = this; // SSD::getInstance();
+    Storage *_hdd = HDD::getInstance();
+
+    // print all device information
+    printvv("DEBUG: before spill from SSD to HDD: %s\n", _dram->reprUsageDetails().c_str());
+    printv("%s\n", _ssd->reprUsageDetails().c_str());
+    printv("%s\n", _hdd->reprUsageDetails().c_str());
+
+    // validate the total runsize does not exceed merge fan-in
+    assert(this->runManager->getTotalRecords() == this->_filled);
+    if (this->_filled > getMergeFanInRecords()) {
+        printvv("ERROR: Run size %lld exceeds merge fan-in %lld\n", this->_filled,
+                getMergeFanInRecords());
+        throw std::runtime_error("Run size exceeds merge fan-in in " + this->getName());
+    }
 
     RowCount ssdPageSize, hddPageSize, ssdCapacity, ssdEmptySpace, dramCapacity;
     getConstants(this, ssdPageSize, hddPageSize, ssdCapacity, ssdEmptySpace, dramCapacity);
-    printv("\t\tstoredRunSizeInSSD: %lld records, %lld pages\n", allRunTotalSize,
-           allRunTotalSize / ssdPageSize);
+    // get the run files sorted by size
+    std::vector<std::pair<std::string, RowCount>> runFiles =
+        runManager->getStoredRunsSortedBySize();
     printv("\t\t#runFiles: %d\n", runFiles.size());
+    printv("\t\tstored runsize in %s: %lld records, %lld pages\n", this->getName().c_str(),
+           this->_filled, this->_filled / ssdPageSize);
 
 
     RowCount _mergeFanOutDRAM = DRAM::getInstance()->getMergeFanOut() * ssdPageSize;
@@ -469,7 +422,7 @@ void SSD::spillRunsToHDD(HDD *hdd) {
         if (nSorted * Config::RECORD_SIZE >= _mergeFanOutDRAM) {
             // write the sorted records to SSD
             Run merged(head->next, ssdPageSize);
-            runManager->storeRun(merged);
+            this->storeRun(merged);
             printv("DEBUG: Merged %lld records in DRAM\n", nSorted);
             // reset the head
             head = new Record();
@@ -542,23 +495,21 @@ DRAM *DRAM::instance = nullptr;
 
 DRAM::DRAM()
     : Storage("DRAM", Config::DRAM_CAPACITY, Config::DRAM_BANDWIDTH, Config::DRAM_LATENCY) {
-    this->_head = nullptr;
-    this->_tail = nullptr;
-    this->_cacheSize = Config::CACHE_SIZE / Config::RECORD_SIZE;
-    this->_miniruns.clear();
+    this->reset();
 }
 
 
 void DRAM::loadRecordsToDRAM(char *data, RowCount nRecords) {
     // create a linked list of records
+    Record *tail = nullptr;
     for (int i = 0; i < nRecords; i++) {
         Record *rec = new Record(data);
         if (_head == NULL) {
             _head = rec;
-            _tail = rec;
+            tail = rec;
         } else {
-            _tail->next = rec;
-            _tail = rec;
+            tail->next = rec;
+            tail = rec;
         }
         // update
         data += Config::RECORD_SIZE;
@@ -588,7 +539,8 @@ void DRAM::genMiniRuns(RowCount nRecords) {
 #endif
 
     // sort the records in cache
-    _miniruns.clear();
+    RowCount _cacheSize = Config::CACHE_SIZE / Config::RECORD_SIZE;
+    assert(_miniruns.size() == 0 && "ERROR: miniruns is not empty");
     // std::vector<int> runSizes;
     Record *curr = _head;
     for (int i = 0; i < nRecords; i += _cacheSize) {
