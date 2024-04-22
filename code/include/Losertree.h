@@ -3,6 +3,7 @@
 
 
 #include "Record.h"
+#include "Storage.h"
 #include <algorithm>
 #include <cassert>
 #include <climits>

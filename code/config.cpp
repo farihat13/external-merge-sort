@@ -245,3 +245,13 @@ ByteCount getFileSize(const std::string &filename) {
     int rc = stat(filename.c_str(), &stat_buf);
     return rc == 0 ? stat_buf.st_size : -1;
 }
+
+std::string getSizeDetails(ByteCount bytes) {
+    std::ostringstream ss;
+    auto nRecords = bytes / Config::RECORD_SIZE;
+    auto kilobytes = BYTE_TO_KB(bytes);
+    auto megabytes = BYTE_TO_MB(bytes);
+    ss << "Size: " << nRecords << " records / " << bytes << " bytes / " << kilobytes << " KB / "
+       << megabytes << " MB";
+    return ss.str();
+}

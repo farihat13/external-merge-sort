@@ -57,27 +57,24 @@ void SortIterator::getPage(Page *p) { TRACE(true); } // SortIterator::getPage
 
 RowCount SortIterator::loadInputToDRAM() {
     TRACE(true);
-    RowCount nRecords = 0; // number of records read
-    PageCount nPages = 0;  // number of pages read
-
-    while (nRecords + _hddPageSize <= _dramCapacity) {
-        RowCount toRead = _hddPageSize;
-        char *records = _hdd->readRecords(&toRead);
-        if (records == NULL || toRead == 0) {
-            printvv("WARNING: no records read\n");
-            break;
-        }
-        nRecords += toRead;
-        nPages++;
-        // loading a hdd page to dram
-        _dram->loadRecordsToDRAM(records, toRead);
+    // read records from HDD to DRAM
+    PageCount nHDDPages = _dramCapacity / _hddPageSize;
+    RowCount nRecordsToRead = nHDDPages * _hddPageSize;
+    char *records = _hdd->readRecords(&nRecordsToRead);
+    if (records == NULL || nRecordsToRead == 0) {
+        printvv("WARNING: no records read\n");
     }
-    printv("STATE -> %llu input records read from HDD to DRAM\n", nRecords);
+    // loading a hdd page to dram
+    _dram->loadRecordsToDRAM(records, nRecordsToRead);
+    // print debug information
+    printv("STATE -> %llu input records read from HDD to DRAM\n", nRecordsToRead);
     printv("ACCESS -> A read from HDD to RAM was made with size %llu bytes and latency %d ms\n",
-           nRecords * Config::RECORD_SIZE, _hdd->getAccessTimeInMillis(nRecords));
-    printv("DEBUG: %llu Disk pages / %llu records read from HDD to RAM\n", nPages, nRecords);
+           nRecordsToRead * Config::RECORD_SIZE, _hdd->getAccessTimeInMillis(nRecordsToRead));
+    printv("DEBUG: %llu Disk pages / %llu records read from HDD to RAM\n", nHDDPages,
+           nRecordsToRead);
     flushv();
-    return nRecords;
+
+    return nRecordsToRead;
 }
 
 void SortIterator::firstPass() {
@@ -99,7 +96,7 @@ void SortIterator::firstPass() {
 
         // 3. Spill some sorted runs to HDD
         RowCount nRecordsLeft = Config::NUM_RECORDS - _consumed;
-        RowCount _ssdCurrSize = _ssd->getRunManager()->getCurrSizeInRecords();
+        RowCount _ssdCurrSize = _ssd->getTotalFilledSpaceInRecords();
         RowCount nRecordsNext = std::min(nRecordsLeft, _dramCapacity);
         // if (_ssdCurrSize + nRecordsNext > _ssdCapacity) { // TODO:
         if (_ssdCurrSize + nRecordsNext > _ssd->getMergeFanInRecords()) {
@@ -108,20 +105,24 @@ void SortIterator::firstPass() {
         }
 
         // 1. Read records from input file to DRAM
-        _dram->resetRecords();
+        _dram->reset();
         RowCount nRecords = this->loadInputToDRAM();
         if (nRecords == 0) {
             printvv("WARNING: no records read\n");
             break;
         }
         _consumed += nRecords;
-        printv("DEBUG: consumed %llu records, current file position %llu\n", _consumed,
-               _hdd->getReadPosition() / Config::RECORD_SIZE);
+        printvv("DEBUG: consumed %llu records, current file position %llu\n", _consumed,
+                _hdd->getReadPosition() / Config::RECORD_SIZE);
+        printv("after loading input: %s\n",
+               _dram->reprUsageDetails().c_str()); // print dram state
 
         // 2. Sort records in DRAM
         _dram->genMiniRuns(nRecords);
-        _dram->mergeMiniRuns(_ssd->getRunManager());
-        printv("DEBUG: %s\n", _ssd->getRunManager()->repr());
+        _dram->mergeMiniRuns(_ssd);
+        printvv("DEBUG: After merging miniruns: %s\n", _ssd->reprStoredRuns().c_str());
+        printv("%s\n", _ssd->reprUsageDetails().c_str());  // print ssd state
+        printv("%s\n", _dram->reprUsageDetails().c_str()); // print dram state
     }
     _hdd->closeRead();
 

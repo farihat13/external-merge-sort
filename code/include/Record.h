@@ -20,7 +20,7 @@
 class Record {
   public:
     char *data;
-    Record *next;
+    Record *next = nullptr;
 
     /**
      * @brief Construct a new Record object,
@@ -30,7 +30,7 @@ class Record {
         data = new char[Config::RECORD_SIZE];
         next = nullptr;
     }
-    Record(char *data) : data(data) { next = nullptr; }
+    Record(char *data) : data(data), next(nullptr) {}
     ~Record() { delete[] data; }
 
     // default comparison based on first 8 bytes of data
@@ -119,8 +119,8 @@ class Page {
     }
 
     // getters
-    RowCount capacityInRecords() { return capacity; }
-    RowCount sizeInRecords() { return records.size(); }
+    RowCount getCapacityInRecords() { return capacity; }
+    RowCount getSizeInRecords() { return records.size(); }
     Record *getFirstRecord() { return records.front(); }
     Record *getLastRecord() { return records.back(); }
     Page *getNext() { return next; }
@@ -164,25 +164,35 @@ class Page {
 
 class RunReader {
   private:
-    std::ifstream is;
-    int PAGE_SIZE_IN_RECORDS;
+    std::string filename;
+    RowCount filesize;
+    RowCount PAGE_SIZE_IN_RECORDS;
+
+    std::ifstream _is;
+    RowCount _nRecordsRead = 0;
 
   public:
-    RunReader(const std::string &filename, int pageSizeInRecords)
-        : is(filename, std::ios::binary), PAGE_SIZE_IN_RECORDS(pageSizeInRecords) {
-        if (!is) {
+    // member functions
+    RunReader(const std::string &filename, RowCount filesize, RowCount pageSizeInRecords)
+        : filename(filename), filesize(filesize), PAGE_SIZE_IN_RECORDS(pageSizeInRecords),
+          _is(filename, std::ios::binary) {
+        if (!_is) {
             throw std::runtime_error("Cannot open file: " + filename);
         }
     }
-
     ~RunReader() {
-        if (is.is_open()) {
-            is.close();
+        if (_is.is_open()) {
+            _is.close();
         }
     }
-
     Page *readNextPage();
-    std::vector<Page *> readNextPages(int nPages);
+    // std::vector<Page *> readNextPages(int nPages);
+
+    // getters
+    std::string getFilename() { return filename; }
+    RowCount getFilesize() { return filesize; }
+    RowCount getPageSizeInRecords() { return PAGE_SIZE_IN_RECORDS; }
+    RowCount getNRecordsRead() { return _nRecordsRead; }
 }; // class RunReader
 
 
@@ -210,102 +220,9 @@ class RunWriter {
     }
 
     RowCount writeNextPage(Page *page);
-    RowCount writeNextPages(std::vector<Page *> &pages);
-
+    // RowCount writeNextPages(std::vector<Page *> &pages);
     RowCount writeNextRun(Run &run);
 }; // class RunWriter
 
-
-// =========================================================
-// ----------------------- RunStreamer ---------------------
-// =========================================================
-
-
-class RunStreamer {
-  private:
-    Record *currentRecord;
-
-    // read from file
-    RunReader *reader;
-    Page *currentPage;
-    int readAhead;
-
-  public:
-    RunStreamer(Run *run) : currentRecord(run->getHead()), reader(nullptr) {
-        if (currentRecord == nullptr) {
-            throw std::runtime_error("Error: RunStreamer initialized with empty run");
-        }
-    }
-
-    RunStreamer(RunReader *reader, int readAhead = 1) : reader(reader), readAhead(readAhead) {
-        currentPage = reader->readNextPage();
-        currentRecord = currentPage->getFirstRecord();
-
-        if (currentRecord == nullptr) {
-            throw std::runtime_error("Error: RunStreamer initialized with empty run");
-        }
-        if (readAhead > 1) {
-            readAheadPages(readAhead - 1);
-        }
-    }
-
-    void readAheadPages(int nPages) {
-        // printvv("DEBUG: readAheadPages(%d)\n", nPages);
-        Page *page = currentPage;
-        for (int i = 0; i < nPages; i++) {
-            Page *p = reader->readNextPage();
-            if (p == nullptr) {
-                break;
-            }
-            page->addNextPage(p);
-            page = p;
-        }
-    }
-    // bool hasNext() { return currentRecord->next != nullptr; }
-
-    Record *moveNext() {
-        // if reader does not exist
-        if (reader == nullptr) {
-            if (currentRecord->next == nullptr) {
-                return nullptr;
-            }
-            currentRecord = currentRecord->next;
-            return currentRecord;
-        }
-
-        // if reader exists
-        if (currentRecord == currentPage->getLastRecord()) {
-            currentPage = currentPage->getNext();
-            if (currentPage == nullptr) { // no more page in memory
-                // read new page and set current record to first record
-                currentPage = reader->readNextPage();
-                if (currentPage == nullptr) {
-                    return nullptr;
-                }
-                currentRecord = currentPage->getFirstRecord();
-                if (readAhead > 1) {
-                    readAheadPages(readAhead - 1);
-                }
-            } else { // more pages in memory
-                currentRecord = currentPage->getFirstRecord();
-            }
-        } else {
-            currentRecord = currentRecord->next;
-        }
-        return currentRecord;
-    }
-
-    Record *getCurrRecord() { return currentRecord; }
-
-    // default comparison based on first 8 bytes of data
-    bool operator<(const RunStreamer &other) const { return *currentRecord < *other.currentRecord; }
-    bool operator>(const RunStreamer &other) const { return *currentRecord > *other.currentRecord; }
-    // equality comparison based on all bytes of data
-    bool operator==(const RunStreamer &other) const {
-        return *currentRecord == *other.currentRecord;
-    }
-
-    char *repr() { return currentRecord->reprKey(); }
-}; // class RunStreamer
 
 #endif // _RECORD_H_
