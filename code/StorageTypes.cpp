@@ -22,6 +22,30 @@ RowCount HDD::storeRun(Run &run) {
     return nRecords;
 }
 
+int HDD::setupMergeStateForMiniruns(RowCount outputDevicePageSize) {
+    printvv("ERROR: setupMergeStateForMiniruns is only for DRAM\n");
+    throw std::runtime_error("Error: setupMergeStateForMiniruns is only for DRAM");
+    return 0;
+}
+
+void HDD::setupMergeState(RowCount outputDevicePageSize, int fanIn) {
+    _totalSpaceInOutputClusters = getMergeFanOut() * outputDevicePageSize;
+    _totalSpaceInInputClusters = ROUNDDOWN(
+        getTotalEmptySpaceInRecords() - _totalSpaceInOutputClusters, outputDevicePageSize);
+    _effectiveClusterSize = _totalSpaceInInputClusters / fanIn;
+    if (_effectiveClusterSize < outputDevicePageSize) {
+        printvv("ERROR: effective cluster size %lld < output device page size %lld\n",
+                _effectiveClusterSize, outputDevicePageSize);
+        throw std::runtime_error("Error: effective cluster size < output device page size"
+                                 " in storage setup");
+    }
+    PageCount clusSize = _effectiveClusterSize / outputDevicePageSize;
+    _totalSpaceInInputClusters = clusSize * fanIn * outputDevicePageSize;
+    _totalSpaceInOutputClusters =
+        ROUNDDOWN(getTotalEmptySpaceInRecords() - _totalSpaceInInputClusters, outputDevicePageSize);
+    _filledInputClusters = 0;
+    _filledOutputClusters = 0;
+}
 
 // RowCount storeRun(Run &run) {
 //     if (getTotalEmptySpaceInRecords() < run.getSize()) {
@@ -97,6 +121,10 @@ void SSD::spillRunsToHDD(HDD *hdd) {
      * 1. setup merging state
      */
     int fanIn = runFiles.size();
+    if ((fanIn + 1) * ssdPageSize > _dram->getCapacityInRecords()) {
+        printvv("ERROR: fanIn %d exceeds capacity %lld of DRAM\n", fanIn, getCapacityInRecords());
+        throw std::runtime_error("Error: fanIn exceeds capacity in storage setup");
+    }
     _dram->setupMergeState(ssdPageSize, fanIn);
     printv("After setting up merging state: %s\n", _dram->reprUsageDetails().c_str());
     RowCount inBufSizePerRunDram = _dram->getEffectiveClusterSize();
@@ -216,6 +244,58 @@ DRAM *DRAM::instance = nullptr;
 DRAM::DRAM()
     : Storage(DRAM_NAME, Config::DRAM_CAPACITY, Config::DRAM_BANDWIDTH, Config::DRAM_LATENCY) {
     this->reset();
+}
+
+/**
+ * @brief Setup merging state for the storage device (used for merging miniruns)
+ * Since, fanIn is not provided, it will use MERGE_FAN_OUT as fanOut
+ * and calculate totalInputClusterSize based on outputDevicePageSize
+ * NOTE: the _effectiveClusterSize will be set to -1, don't use it
+ * @return the fanOut value used
+ */
+int DRAM::setupMergeStateForMiniruns(RowCount outputDevicePageSize) {
+    // NOTE: don't use getTotalEmptySpaceInRecords() here, since the dram is already filled
+    _totalSpaceInOutputClusters =
+        ROUNDUP(getClusterSize() * getPageSizeInRecords(), outputDevicePageSize);
+    _totalSpaceInInputClusters =
+        ROUNDDOWN(getCapacityInRecords() - _totalSpaceInOutputClusters, outputDevicePageSize);
+    _totalSpaceInOutputClusters =
+        ROUNDDOWN(getCapacityInRecords() - _totalSpaceInInputClusters, outputDevicePageSize);
+    _effectiveClusterSize = _totalSpaceInOutputClusters / getMergeFanOut();
+    _filledInputClusters = 0;
+    _filledOutputClusters = 0;
+    return getMergeFanOut();
+}
+
+void DRAM::setupMergeState(RowCount outputDevicePageSize, int fanIn) {
+    assert(_filled == 0 && "ERROR: DRAM is not empty");
+    /** assumption: the following check will be done before calling this */
+    // if ((fanIn + 1) * outputDevicePageSize > getCapacityInRecords()) {
+    //     printvv("ERROR: fanIn %d exceeds capacity %lld\n", fanIn, getCapacityInRecords());
+    //     throw std::runtime_error("Error: fanIn exceeds capacity in storage setup");
+    // }
+
+    RowCount maxFanOut = getCapacityInRecords() - outputDevicePageSize * fanIn;
+    _totalSpaceInOutputClusters = std::min(maxFanOut, getMergeFanOutRecords());
+    _totalSpaceInInputClusters =
+        ROUNDDOWN(getCapacityInRecords() - _totalSpaceInOutputClusters, outputDevicePageSize);
+
+    _effectiveClusterSize = _totalSpaceInInputClusters / fanIn;
+    if (_effectiveClusterSize < outputDevicePageSize) { /** this should not occur */
+        printvv("ERROR: effective cluster size %lld < output device page size %lld\n",
+                _effectiveClusterSize, outputDevicePageSize);
+        throw std::runtime_error("Error: effective cluster size < output device page size"
+                                 " in storage setup");
+    }
+
+    PageCount clusSize = _effectiveClusterSize / outputDevicePageSize;
+    _totalSpaceInInputClusters = clusSize * fanIn * outputDevicePageSize;
+    _totalSpaceInOutputClusters =
+        ROUNDDOWN(getCapacityInRecords() - _totalSpaceInInputClusters, outputDevicePageSize);
+
+    _filledInputClusters = 0;
+    _filledOutputClusters = 0;
+    printvv("DEBUG: Set up merge state for %s\n", this->getName().c_str());
 }
 
 
