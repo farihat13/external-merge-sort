@@ -73,7 +73,7 @@ int Page::addRecord(Record *rec) {
 
 int Page::read(std::ifstream &is) {
     if (is.eof()) {
-        traceprintf("EOF reached\n");
+        // traceprintf("EOF reached\n");
         return 0;
     }
     // 1.1 read page.capacityInRecords() records
