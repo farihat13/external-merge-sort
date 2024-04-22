@@ -98,7 +98,7 @@ Storage::Storage(std::string name, ByteCount capacity, int bandwidth, double lat
     : name(name), CAPACITY_IN_BYTES(capacity), BANDWIDTH(bandwidth), LATENCY(latency) {
 
     printv("INFO: Storage %s\n", name.c_str());
-    if (CAPACITY_IN_BYTES == INT_MAX) {
+    if (CAPACITY_IN_BYTES == INFINITE_CAPACITY) {
         printv("\tCapacity: Infinite\n");
     } else {
         printv("\tCapacity %s\n", getSizeDetails(CAPACITY_IN_BYTES).c_str());
@@ -137,6 +137,73 @@ void Storage::configure() {
     printv("\t\t_mergeFanIn: %llu records\n", this->MERGE_FANIN_IN_RECORDS);
     printv("\t\t_mergeFanOut: %llu records\n", this->MERGE_FANOUT_IN_RECORDS);
 }
+
+// ------------------------------- Run Management ------------------------------
+
+RunWriter *Storage::getRunWriter() {
+    std::string filename = runManager->getNextRunFileName();
+    return new RunWriter(filename);
+}
+
+void Storage::closeWriter(RunWriter *writer) {
+    // this->addRunFile(writer->getFilename(), writer->getSize());
+    RowCount nRecords = writer->getCurrSize();
+    runManager->addRunFile(writer->getFilename(), nRecords);
+    _filled += nRecords;
+    writer->close();
+    delete writer;
+}
+
+
+// ------------------------------- Merging state -------------------------------
+
+
+void Storage::setupMergeState(RowCount outputDevicePageSize, int fanIn) {
+    _totalSpaceInOutputClusters = MERGE_FAN_OUT * outputDevicePageSize;
+    _totalSpaceInInputClusters = ROUNDDOWN(
+        getTotalEmptySpaceInRecords() - _totalSpaceInOutputClusters, outputDevicePageSize);
+    _effectiveClusterSize = _totalSpaceInInputClusters / fanIn;
+    if (_effectiveClusterSize < outputDevicePageSize) {
+        printvv("ERROR: effective cluster size %lld < output device page size %lld\n",
+                _effectiveClusterSize, outputDevicePageSize);
+        throw std::runtime_error("Error: effective cluster size < output device page size"
+                                 " in storage setup");
+    }
+    PageCount clusSize = _effectiveClusterSize / outputDevicePageSize;
+    _totalSpaceInInputClusters = clusSize * fanIn * outputDevicePageSize;
+    _totalSpaceInOutputClusters =
+        ROUNDDOWN(getTotalEmptySpaceInRecords() - _totalSpaceInInputClusters, outputDevicePageSize);
+    _filledInputClusters = 0;
+    _filledOutputClusters = 0;
+}
+
+/**
+ * @brief Setup merging state for the storage device (used for merging miniruns)
+ * Since, fanIn is not provided, it will use MERGE_FAN_OUT as fanOut
+ * and calculate totalInputClusterSize based on outputDevicePageSize
+ * NOTE: the _effectiveClusterSize will be set to -1, don't use it
+ * @return the fanOut value used
+ */
+int Storage::setupMergeStateForMiniruns(RowCount outputDevicePageSize) {
+    if (this->name != DRAM_NAME) {
+        printvv("ERROR: setupMergeStateForMiniruns is only for DRAM\n");
+        throw std::runtime_error("Error: setupMergeStateForMiniruns is only for DRAM");
+    }
+    // NOTE: don't use getTotalEmptySpaceInRecords() here, since the dram is already filled
+    _totalSpaceInOutputClusters =
+        ROUNDUP(CLUSTER_SIZE * this->PAGE_SIZE_IN_RECORDS, outputDevicePageSize);
+    _totalSpaceInInputClusters =
+        ROUNDDOWN(getCapacityInRecords() - _totalSpaceInOutputClusters, outputDevicePageSize);
+    _totalSpaceInOutputClusters =
+        ROUNDDOWN(getCapacityInRecords() - _totalSpaceInInputClusters, outputDevicePageSize);
+    _effectiveClusterSize = _totalSpaceInOutputClusters / MERGE_FAN_OUT;
+    _filledInputClusters = 0;
+    _filledOutputClusters = 0;
+    return MERGE_FAN_OUT;
+}
+
+
+// --------------------------------- File IO -----------------------------------
 
 
 bool Storage::readFrom(const std::string &filePath) {
@@ -202,6 +269,24 @@ void Storage::closeRead() {
 void Storage::closeWrite() {
     if (writeFile.is_open())
         writeFile.close();
+}
+
+
+// ---------------------------- printing -----------------------------------
+std::string Storage::reprUsageDetails() {
+    std::string state = "\n\t" + this->name + " usage details: ";
+    state += "\n\t\t_filled: " + std::to_string(_filled) + " records";
+    state += "\n\t\tinputcluster: " + std::to_string(_filledInputClusters) + " out of " +
+             std::to_string(_totalSpaceInInputClusters) + " records, ";
+    state += "\n\t\toutputcluster: " + std::to_string(_filledOutputClusters) + " out of " +
+             std::to_string(_totalSpaceInOutputClusters) + " records";
+    state += "\n\t\teffective cluster size: " + std::to_string(_effectiveClusterSize) + " records";
+    state += "\n\t\ttotal filled: " + std::to_string(getTotalFilledSpaceInRecords()) + " records";
+    state += "\n\t\ttotal capacity: " + std::to_string(getCapacityInRecords()) + " records";
+    state +=
+        "\n\t\ttotal empty space: " + std::to_string(getTotalEmptySpaceInRecords()) + " records";
+    state += "\n\t\t" + runManager->repr();
+    return state;
 }
 
 

@@ -14,6 +14,35 @@ HDD *HDD::instance = nullptr;
 HDD::HDD(std::string name, ByteCount capacity, int bandwidth, double latency)
     : Storage(name, capacity, bandwidth, latency) {}
 
+RowCount HDD::storeRun(Run &run) {
+
+    RunWriter *writer = getRunWriter();
+    RowCount nRecords = writer->writeNextRun(run);
+    closeWriter(writer);
+    return nRecords;
+}
+
+
+// RowCount storeRun(Run &run) {
+//     if (getTotalEmptySpaceInRecords() < run.getSize()) {
+//         printvv("ERROR: Run size %lld exceeds storage empty space\n", run.getSize());
+//         printvv("%s\n", reprUsageDetails().c_str());
+//         throw std::runtime_error(this->getName() + " is full, cannot store run");
+//     }
+//     RunWriter *writer = getRunWriter();
+//     RowCount nRecords = writer->writeNextRun(run);
+//     if (nRecords != run.getSize()) {
+//         printvv("ERROR: Writing %lld records, expected %lld\n", nRecords, run.getSize());
+//         throw std::runtime_error("Error: Writing run to file");
+//     }
+//     runManager->addRunFile(writer->getFilename(), nRecords);
+//     _filled += nRecords;
+//     // this->storeMore(nRecords);
+//     writer->close();
+//     delete writer;
+//     return nRecords;
+// }
+
 
 // =========================================================
 // -------------------------- SSD -------------------------
@@ -21,9 +50,12 @@ HDD::HDD(std::string name, ByteCount capacity, int bandwidth, double latency)
 
 SSD *SSD::instance = nullptr;
 
-SSD::SSD() : HDD("SSD", Config::SSD_CAPACITY, Config::SSD_BANDWIDTH, Config::SSD_LATENCY) {}
+SSD::SSD() : HDD(SSD_NAME, Config::SSD_CAPACITY, Config::SSD_BANDWIDTH, Config::SSD_LATENCY) {}
 
 
+/**
+ * @brief helper function to get the constants for spillRunsToHDD
+ */
 void getConstants(SSD *ssd, RowCount &ssdPageSize, RowCount &hddPageSize, RowCount &ssdCapacity,
                   RowCount &ssdEmptySpace, RowCount &dramCapacity) {
     ssdPageSize = ssd->getPageSizeInRecords();
@@ -31,12 +63,6 @@ void getConstants(SSD *ssd, RowCount &ssdPageSize, RowCount &hddPageSize, RowCou
     ssdCapacity = ssd->getCapacityInRecords();
     ssdEmptySpace = ssd->getTotalEmptySpaceInRecords();
     dramCapacity = DRAM::getInstance()->getCapacityInRecords();
-    printv("\t\tdramEmptySpace: %lld records\n", DRAM::getInstance()->getCapacityInRecords());
-    printv("\t\tssdPageSize: %lld records\n", ssdPageSize);
-    printv("\t\thddPageSize: %lld records\n", hddPageSize);
-    printv("\t\tssdCapacity: %lld records\n", ssdCapacity);
-    printv("\t\tssdEmptySpace: %lld records, %lld pages\n", ssdEmptySpace,
-           ssdEmptySpace / ssdPageSize);
 }
 
 
@@ -50,8 +76,7 @@ void SSD::spillRunsToHDD(HDD *hdd) {
     // print all device information
     printvv("DEBUG: before spill from SSD to HDD: %s\n", _dram->reprUsageDetails().c_str());
     printv("%s\n", _ssd->reprUsageDetails().c_str());
-    printv("%s\n", _hdd->reprUsageDetails().c_str());
-
+    printv("%s\n\n", _hdd->reprUsageDetails().c_str());
     // validate the total runsize does not exceed merge fan-in
     assert(this->runManager->getTotalRecords() == this->_filled);
     if (this->_filled > getMergeFanInRecords()) {
@@ -62,81 +87,71 @@ void SSD::spillRunsToHDD(HDD *hdd) {
 
     RowCount ssdPageSize, hddPageSize, ssdCapacity, ssdEmptySpace, dramCapacity;
     getConstants(this, ssdPageSize, hddPageSize, ssdCapacity, ssdEmptySpace, dramCapacity);
-    // get the run files sorted by size
+    // get the runfile names sorted by size ascending
     std::vector<std::pair<std::string, RowCount>> runFiles =
         runManager->getStoredRunsSortedBySize();
-    printv("\t\t#runFiles: %d\n", runFiles.size());
-    printv("\t\tstored runsize in %s: %lld records, %lld pages\n", this->getName().c_str(),
-           this->_filled, this->_filled / ssdPageSize);
+    printv("\t\t%s: %d runfiles, %lld records, %lld pages\n", this->getName().c_str(),
+           runFiles.size(), this->_filled, this->_filled / ssdPageSize);
 
+    /**
+     * 1. setup merging state
+     */
+    int fanIn = runFiles.size();
+    _dram->setupMergeState(ssdPageSize, fanIn);
+    printv("After setting up merging state: %s\n", _dram->reprUsageDetails().c_str());
+    RowCount inBufSizePerRunDram = _dram->getEffectiveClusterSize();
+    RowCount totalOutBufSizeDram = _dram->getTotalSpaceInOutputClusters();
 
-    RowCount _mergeFanOutDRAM = DRAM::getInstance()->getMergeFanOut() * ssdPageSize;
-    RowCount _mergeFanInDRAM = ROUNDDOWN(dramCapacity - _mergeFanOutDRAM, ssdPageSize);
-    printv("\t\tmergeFanInDRAM: %lld records, %lld ssdPages\n", _mergeFanInDRAM,
-           _mergeFanInDRAM / ssdPageSize);
-    printv("\t\tmergeFanOutDRAM: %lld records, %lld ssdPages\n", _mergeFanOutDRAM, 2);
-
-    if (runFiles.size() > _mergeFanInDRAM) {
-        printvv("ERROR: More runs than mergeFanInDRAM\n");
-        throw std::runtime_error("More runs than mergeFanInDRAM");
-    }
-
-    int inputBufSizePerRun = _mergeFanInDRAM / (runFiles.size() * ssdPageSize);
-    // adjust mergeFanInDRAM and mergeFanOutDRAM
-    _mergeFanInDRAM = inputBufSizePerRun * runFiles.size() * ssdPageSize;
-    _mergeFanOutDRAM = ROUNDDOWN(dramCapacity - _mergeFanInDRAM, ssdPageSize);
-    printv("\t\tadjusted mergeFanInDRAM: %lld records, %lld ssdPages\n", _mergeFanInDRAM,
-           _mergeFanInDRAM / ssdPageSize);
-    printv("\t\tadjusted mergeFanOutDRAM: %lld records, %lld ssdPages\n", _mergeFanOutDRAM, 2);
-    printv("\t\treadAhead: %d\n", inputBufSizePerRun);
-
-    // 1. read the runs from SSD
+    /**
+     * 2. read the runs from SSD
+     */
     std::vector<RunStreamer *> runStreamers;
     RowCount willFill = 0;
     for (int i = 0; i < runFiles.size(); i++) {
         std::string runFilename = runFiles[i].first;
         RowCount runSize = runFiles[i].second;
         printv("Run %d: %s, %lld records\n", i, runFilename.c_str(), runSize);
+        // create a run reader and streamer
         RunReader *reader = new RunReader(runFilename, runSize, ssdPageSize);
-        RowCount willRead = std::min((inputBufSizePerRun * ssdPageSize), runSize);
+        RowCount willRead = std::min((inBufSizePerRunDram * ssdPageSize), runSize);
         willFill += willRead;
-        RunStreamer *runStreamer = new RunStreamer(reader, this, inputBufSizePerRun);
+        RunStreamer *runStreamer = new RunStreamer(reader, this, inBufSizePerRunDram);
         runStreamers.push_back(runStreamer);
     }
     printv("\t\twillFill %llu\n", willFill);
     flushv();
 
-    // 2. remaining runs fit in DRAM, merge them
-    LoserTree loserTree;
-    loserTree.constructTree(runStreamers);
-    printv("DEBUG: Merging %d runs in DRAM\n", runStreamers.size());
-    Record *head = new Record();
-    Record *current = head;
-    RowCount nSorted = 0;
-    RunWriter writer("merged.txt");
-    while (true) {
-        Record *winner = loserTree.getNext();
-        if (winner == NULL) {
-            break;
-        }
-        flushv();
-        current->next = winner;
-        current = current->next;
-        nSorted++;
+    // // 2. remaining runs fit in DRAM, merge them
+    // LoserTree loserTree;
+    // loserTree.constructTree(runStreamers);
+    // printv("DEBUG: Merging %d runs in DRAM\n", runStreamers.size());
+    // Record *head = new Record();
+    // Record *current = head;
+    // RowCount nSorted = 0;
+    // RunWriter writer("merged.txt");
+    // while (true) {
+    //     Record *winner = loserTree.getNext();
+    //     if (winner == NULL) {
+    //         break;
+    //     }
+    //     flushv();
+    //     current->next = winner;
+    //     current = current->next;
+    //     nSorted++;
 
-        if (nSorted * Config::RECORD_SIZE >= _mergeFanOutDRAM) {
-            // write the sorted records to SSD
-            Run merged(head->next, ssdPageSize);
-            this->storeRun(merged);
-            printv("DEBUG: Merged %lld records in DRAM\n", nSorted);
-            // reset the head
-            head = new Record();
-            current = head;
-        }
-    }
-    Record *merged = head->next;
-    Run mergedRun(merged, nSorted);
-    printv("DEBUG: Merged %lld records in DRAM\n", nSorted);
+    //     if (nSorted * Config::RECORD_SIZE >= totalOutBufSizeDram) {
+    //         // write the sorted records to SSD
+    //         Run merged(head->next, ssdPageSize);
+    //         this->storeRun(merged);
+    //         printv("DEBUG: Merged %lld records in DRAM\n", nSorted);
+    //         // reset the head
+    //         head = new Record();
+    //         current = head;
+    //     }
+    // }
+    // Record *merged = head->next;
+    // Run mergedRun(merged, nSorted);
+    // printv("DEBUG: Merged %lld records in DRAM\n", nSorted);
 
     exit(0);
 
@@ -199,7 +214,7 @@ void quickSort(std::vector<Record *> &records) {
 DRAM *DRAM::instance = nullptr;
 
 DRAM::DRAM()
-    : Storage("DRAM", Config::DRAM_CAPACITY, Config::DRAM_BANDWIDTH, Config::DRAM_LATENCY) {
+    : Storage(DRAM_NAME, Config::DRAM_CAPACITY, Config::DRAM_BANDWIDTH, Config::DRAM_LATENCY) {
     this->reset();
 }
 
@@ -287,23 +302,35 @@ void DRAM::mergeMiniRuns(HDD *outputStorage) {
         //         _miniruns[i].getSize());
         assert(count == _miniruns[i].getSize() && "VALIDATE: Run size mismatch");
     }
+    // printv("before spill: %s\n", this->reprUsageDetails().c_str());
+    // printv("%s\n", outputStorage->reprUsageDetails().c_str());
 #endif
 
-    // 1. spill the runs that don't fit in _mergeFanInRec to SSD
-    printv("DEBUG: _mergeFanIn: %lld records, _mergeFanOut: %lld records\n", getMergeFanInRecords(),
-           getMergeFanOutRecords());
-    printv("before spill: %s\n", this->reprUsageDetails().c_str());
-    printv("%s\n", outputStorage->reprUsageDetails().c_str());
+    /**
+     * 1. setup merging state
+     */
+    setupMergeStateForMiniruns(outputStorage->getPageSizeInRecords());
+    RowCount totalInBufSizeDram = this->getTotalSpaceInInputClusters();
+    printv("After setting up merging state: %s\n", this->reprUsageDetails().c_str());
+
+    /**
+     * 2. spill the runs that don't fit in _mergeFanInRec to SSD
+     */
     RowCount keepNRecords = 0;
     int i = 0;
     for (; i < _miniruns.size(); i++) {
         int size = _miniruns[i].getSize();
-        if (keepNRecords + size < getMergeFanInRecords()) {
+        if (keepNRecords + size < totalInBufSizeDram) {
             keepNRecords += size;
-        } else {
+        } else
             break;
-        }
     }
+    /* transfer these runs to input buffer */
+    _filledInputClusters += keepNRecords;
+    _filled -= keepNRecords;
+    // printv("After transferring %lld records to input buffer: %s\n", keepNRecords,
+    //        this->reprUsageDetails().c_str());
+
     if (i < _miniruns.size()) {
         printv("DEBUG: spill %d runs out of %d to SSDs\n", _miniruns.size() - i, _miniruns.size());
         printv("\t\tspill from %dth runs to SSD\n", i);
@@ -312,31 +339,34 @@ void DRAM::mergeMiniRuns(HDD *outputStorage) {
         for (j = i; j < _miniruns.size(); j++) {
             spillNRecords += _miniruns[j].getSize();
             outputStorage->storeRun(_miniruns[j]);
-            this->freeMore(_miniruns[j].getSize());
             printv("\t\tSpilled run %d to SSD\n", j);
             flushv();
         }
         _miniruns.erase(_miniruns.begin() + i, _miniruns.end());
 
-        printv("DEBUG: STATE -> %d runs spilled to SSD\n", j - i);
-        printv(
-            "ACCESS -> A write from RAM to SSD was made with size %llu bytes and latency %d ms\n",
-            spillNRecords * Config::RECORD_SIZE, getAccessTimeInMillis(keepNRecords));
+        printv("STATE -> %d cache-sized miniruns spilled to SSD\n", j - i);
+        printv("ACCESS -> A write from RAM to SSD was made with size %llu bytes and latency %d "
+               "ms\n",
+               spillNRecords * Config::RECORD_SIZE, getAccessTimeInMillis(keepNRecords));
+        // printv("after spill: %s\n", this->reprUsageDetails().c_str());
+        // printv("%s\n", outputStorage->reprUsageDetails().c_str());
     } else {
         printv("DEBUG: All runs fit in DRAM\n");
     }
-    printv("after spill: %s\n", this->reprUsageDetails().c_str());
-    printv("%s\n", outputStorage->reprUsageDetails().c_str());
 
-
-    // 2. remaining runs fit in DRAM, merge them
+    /**
+     * 3. remaining runs fit in DRAM, merge them
+     * 4. when the merged run size fills the output buffer size, store the run in SSD
+     */
     LoserTree loserTree;
     loserTree.constructTree(_miniruns);
+    RunWriter *writer = outputStorage->getRunWriter();
+    printv("STATE -> Merging %d cache-sized miniruns\n", _miniruns.size());
 
-    printv("DEBUG: Merging %d runs in DRAM\n", _miniruns.size());
     Record *head = new Record();
     Record *current = head;
     RowCount nSorted = 0;
+    RowCount runningCount = 0;
     while (true) {
         Record *winner = loserTree.getNext();
         if (winner == NULL) {
@@ -344,17 +374,41 @@ void DRAM::mergeMiniRuns(HDD *outputStorage) {
         }
         // printv("\t\tWinner: %s\n", winner->reprKey());
         flushv();
+        // winner->next = nullptr;
         current->next = winner;
         current = current->next;
         nSorted++;
-        if (nSorted > keepNRecords) {
+        runningCount++;
+        if (nSorted > keepNRecords) { // verify the size
             printvv("ERROR: Merged run size exceeds %lld\n", keepNRecords);
             throw std::runtime_error("Merged run size exceeds");
         }
+        if (runningCount >= _totalSpaceInOutputClusters) {
+            /* write the sorted records to SSD */
+            Run merged(head->next, runningCount);
+            RowCount nRecord = writer->writeNextRun(merged);
+            assert(nRecord == runningCount && "ERROR: Writing run to file");
+            printv("\tACCESS -> A write to %s was made with size %llu bytes and latency %d ms\n",
+                   outputStorage->getName().c_str(), runningCount * Config::RECORD_SIZE,
+                   getAccessTimeInMillis(runningCount));
+            /* reset the head */
+            head->next = nullptr;
+            current = head;
+            runningCount = 0;
+        }
     }
-    Record *merged = head->next;
-    Run mergedRun(merged, keepNRecords);
-
+    if (runningCount > 0) {
+        /* write the remaining records */
+        Run merged(head->next, runningCount);
+        RowCount nRecord = writer->writeNextRun(merged);
+        assert(nRecord == runningCount && "ERROR: Writing remains of run to file");
+        printv("\tACCESS -> A write to %s was made with size %llu bytes and latency %d ms\n",
+               outputStorage->getName().c_str(), runningCount * Config::RECORD_SIZE,
+               getAccessTimeInMillis(runningCount));
+    }
+    /* update the SSD used space */
+    outputStorage->closeWriter(writer);
+    printv("DEBUG: Merged %lld records in DRAM\n", nSorted);
 
 #if defined(_VALIDATE)
     if (nSorted != keepNRecords) {
@@ -362,8 +416,8 @@ void DRAM::mergeMiniRuns(HDD *outputStorage) {
     }
     assert(nSorted == keepNRecords && "VALIDATE: Merged run size mismatch");
     // validate the merged run
-    Record *rec = merged;
-    while (rec->next != nullptr) {
+    Record *rec = head->next;
+    while (rec != nullptr && rec->next != nullptr) {
         if (!(*rec < *rec->next)) {
             printvv("ERROR: Merged run is not sorted\n");
             printv("\t\t%s vs. %s\n", rec->reprKey(), rec->next->reprKey());
@@ -371,15 +425,13 @@ void DRAM::mergeMiniRuns(HDD *outputStorage) {
         assert(*rec < *rec->next && "VALIDATE: Merged run is not sorted");
         rec = rec->next;
     }
+    // printv("after merge: %s\n", this->reprUsageDetails().c_str());
+    // printv("%s\n", outputStorage->reprUsageDetails().c_str());
 #endif
-    printvv("DEBUG: Merged %d runs / %lld records\n", _miniruns.size(), keepNRecords);
 
-    // 3. store the merged run in SSD
-    outputStorage->storeRun(mergedRun);
-    printvv("DEBUG: Stored merged run in SSD\n");
-    printvv("ACCESS -> A write from RAM to SSD was made with size %llu bytes and latency %d ms\n",
-            keepNRecords * Config::RECORD_SIZE, getAccessTimeInMillis(keepNRecords));
-
-    // 4. reset the DRAM
-    reset();
+    /**
+     * 5. reset the DRAM and the merge state
+     */
+    this->reset();
+    this->resetMergeState();
 }

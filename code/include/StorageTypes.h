@@ -9,7 +9,7 @@ class HDD : public Storage {
     static HDD *instance;
 
   protected:
-    HDD(std::string name = "HDD", ByteCount capacity = Config::HDD_CAPACITY,
+    HDD(std::string name = DISK_NAME, ByteCount capacity = Config::HDD_CAPACITY,
         int bandwidth = Config::HDD_BANDWIDTH, double latency = Config::HDD_LATENCY);
 
   public:
@@ -25,25 +25,7 @@ class HDD : public Storage {
             delete runManager;
         }
     }
-
-    RowCount storeRun(Run &run) {
-        if (getTotalEmptySpaceInRecords() < run.getSize()) {
-            printvv("ERROR: Run size %lld exceeds storage empty space\n", run.getSize());
-            printvv("%s\n", reprUsageDetails().c_str());
-            throw std::runtime_error(this->getName() + " is full, cannot store run");
-        }
-        std::string filename = runManager->getNextRunFileName();
-        RunWriter writer(filename);
-        RowCount nRecords = writer.writeNextRun(run);
-        if (nRecords != run.getSize()) {
-            printvv("ERROR: Writing %lld records, expected %lld\n", nRecords, run.getSize());
-            throw std::runtime_error("Error: Writing run to file");
-        }
-        runManager->addRunFile(filename, nRecords);
-        _filled += nRecords;
-        // this->storeMore(nRecords);
-        return nRecords;
-    }
+    RowCount storeRun(Run &run);
 };
 
 // ==================================================================

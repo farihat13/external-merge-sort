@@ -19,9 +19,9 @@ double Config::SSD_LATENCY = 1.0 / (10 * 1000);            // 0.1 ms
 int Config::SSD_BANDWIDTH = 100 * 1024 * 1024;             // 100 MB/s
 // SSD buffer size = 10 MB
 // ---- HDD ----
-ByteCount Config::HDD_CAPACITY = INT_MAX * 1LL; // Infinite
-double Config::HDD_LATENCY = 1 * 10.0 / 1000;   // 10 ms
-int Config::HDD_BANDWIDTH = 100 * 1024 * 1024;  // 100 MB/s
+ByteCount Config::HDD_CAPACITY = INFINITE_CAPACITY * 1LL; // Infinite
+double Config::HDD_LATENCY = 1 * 10.0 / 1000;             // 10 ms
+int Config::HDD_BANDWIDTH = 100 * 1024 * 1024;            // 100 MB/s
 // ---- Record ----
 int Config::RECORD_KEY_SIZE = 8;     // 8 bytes
 int Config::RECORD_SIZE = 1024;      // 1024 bytes
