@@ -145,6 +145,18 @@ RunWriter *Storage::getRunWriter() {
     return new RunWriter(filename);
 }
 
+
+RowCount Storage::writeNextChunk(RunWriter *writer, Run &run) {
+    RowCount _empty = this->getTotalEmptySpaceInRecords();
+    if (writer->getCurrSize() >= _empty) {
+        // TODO: spill some runs to HDD
+        printvv("WARNING: %s is full, spill some runs to HDD\n", this->name.c_str());
+        // return 0;
+    }
+    RowCount nRecord = writer->writeNextRun(run);
+    return nRecord;
+}
+
 void Storage::closeWriter(RunWriter *writer) {
     // this->addRunFile(writer->getFilename(), writer->getSize());
     RowCount nRecords = writer->getCurrSize();
@@ -256,40 +268,46 @@ RunStreamer::RunStreamer(Run *run) : currentRecord(run->getHead()), reader(nullp
     }
 }
 
-RunStreamer::RunStreamer(RunReader *reader, Storage *device, int readAhead)
-    : reader(reader), device(device), readAhead(readAhead) {
-
-    RowCount nRecords = 0;
-    currentPage = reader->readNextPage();
-    nRecords += currentPage->getSizeInRecords();
+RunStreamer::RunStreamer(RunReader *reader, Storage *fromDevice, Storage *toDevice,
+                         PageCount readAhead)
+    : reader(reader), fromDevice(fromDevice), toDevice(toDevice), readAhead(readAhead) {
+    if (readAhead < 1) {
+        throw std::runtime_error("Error: ReadAhead should be at least 1");
+    }
+    RowCount nRecords = readAheadPages(readAhead);
+    if (nRecords == 0) {
+        throw std::runtime_error("Error: RunStreamer initialized with empty run");
+    }
     currentRecord = currentPage->getFirstRecord();
     if (currentRecord == nullptr) {
         throw std::runtime_error("Error: RunStreamer initialized with empty run");
     }
-    if (readAhead > 1) {
-        RowCount n = readAheadPages(readAhead - 1);
-        nRecords += n;
-    }
-    printvv("DEBUG: constructor: readAhead %d pages, %ld records\n", readAhead, nRecords);
-    printvv("STATE -> Read %lld records from %s\n", nRecords, reader->getFilename().c_str());
-    printvv("ACCESS -> A read from %s was made with size %llu bytes and latency %d ms\n",
-            device->getName().c_str(), nRecords * Config::RECORD_SIZE,
-            device->getAccessTimeInMillis(nRecords));
 }
 
 RowCount RunStreamer::readAheadPages(int nPages) {
-    // printvv("DEBUG: readAheadPages(%d)\n", nPages);
     RowCount nRecords = 0;
+    currentPage = reader->readNextPage();
+    if (currentPage == nullptr) {
+        reader->close();
+        return 0;
+    }
+    nRecords += currentPage->getSizeInRecords();
     Page *page = currentPage;
     for (int i = 0; i < nPages; i++) {
         Page *p = reader->readNextPage();
         if (p == nullptr) {
+            reader->close();
             break;
         }
         nRecords += p->getSizeInRecords();
         page->addNextPage(p);
         page = p;
     }
+    toDevice->fillInputCluster(nRecords);
+    printv("\tSTATE -> Read %lld records from %s\n", nRecords, reader->getFilename().c_str());
+    printv("\tACCESS -> A read from %s was made with size %llu bytes and latency %d ms\n",
+           fromDevice->getName().c_str(), nRecords * Config::RECORD_SIZE,
+           fromDevice->getAccessTimeInMillis(nRecords));
     return nRecords;
 }
 
@@ -311,23 +329,11 @@ Record *RunStreamer::moveNext() {
             currentRecord = currentPage->getFirstRecord(); // set current record to first record
         } else {
             // if no more page in memory, read next `readAhead` pages
-            RowCount nRecords = 0;
-            currentPage = reader->readNextPage();
-            if (currentPage == nullptr) {
+            RowCount nRecords = readAheadPages(readAhead);
+            if (nRecords == 0) {
                 return nullptr;
             }
-            nRecords += currentPage->getSizeInRecords();
             currentRecord = currentPage->getFirstRecord();
-            if (readAhead > 1) {
-                RowCount n = readAheadPages(readAhead - 1);
-                nRecords += n;
-            }
-            printvv("DEBUG: readAhead %d pages, %ld records\n", readAhead, nRecords);
-            printvv("STATE -> Read %lld records from %s\n", nRecords,
-                    reader->getFilename().c_str());
-            printvv("ACCESS -> A read from %s was made with size %llu bytes and latency %d ms\n",
-                    device->getName().c_str(), nRecords * Config::RECORD_SIZE,
-                    device->getAccessTimeInMillis(nRecords));
         }
     } else {
         // if this is not the last record in the page,

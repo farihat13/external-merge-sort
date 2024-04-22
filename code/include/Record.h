@@ -187,11 +187,19 @@ class RunReader {
         if (!_is) {
             throw std::runtime_error("Cannot open file: " + filename);
         }
+        printv("\t\t\tDEBUG: RunReader opened '%s'\n", filename.c_str());
     }
     ~RunReader() {
         if (_is.is_open()) {
             _is.close();
         }
+        printv("\t\t\tDEBUG: RunReader destroyed '%s'\n", filename.c_str());
+    }
+    void close() {
+        if (_is.is_open()) {
+            _is.close();
+        }
+        printv("\t\t\tDEBUG: RunReader closed '%s'\n", filename.c_str());
     }
     Page *readNextPage();
     // std::vector<Page *> readNextPages(int nPages);
