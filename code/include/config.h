@@ -125,6 +125,7 @@ void flushVerbose();
 
 
 ByteCount getFileSize(const std::string &filename);
+std::string getSizeDetails(ByteCount size);
 
 
 #endif // _CONFIG_H_

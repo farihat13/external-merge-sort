@@ -49,3 +49,4 @@ our_version/externalsort
 rough/*
 *SSD_runs*
 *HDD_runs*
+code/.vscode/*

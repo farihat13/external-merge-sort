@@ -2,7 +2,6 @@
 #define _STORAGE_H_
 
 
-#include "Losertree.h"
 #include "Record.h"
 #include "config.h"
 #include "defs.h"
@@ -22,17 +21,17 @@
 
 class Storage {
     std::string name;
-    // ---- configurations ----
+    // ---- provided configurations ----
     ByteCount CAPACITY_IN_BYTES = 0; // in bytes
     int BANDWIDTH = 0;               // in MB/s
     double LATENCY = 0;              // in ms
-
     // ---- calibrable configurations ----
     RowCount PAGE_SIZE_IN_RECORDS = 0; // in records
     PageCount CLUSTER_SIZE = 0;        // in pages
-    int MERGE_FAN_IN = 30;             // number of runs to merge at a time
-    int MERGE_FAN_OUT = 2;
-
+    int MERGE_FAN_IN = 30;             // #runs to merge at a time, or #input_clusters
+    int MERGE_FAN_OUT = 2;             // #output_clusters
+    RowCount MERGE_FANIN_IN_RECORDS;   // total #records to merge at a time per input cluster
+    RowCount MERGE_FANOUT_IN_RECORDS;  // total #records that can be stored in output clusters
     // ---- read/write buffer ----
     std::string readFilePath, writeFilePath;
     std::ifstream readFile;
@@ -40,8 +39,13 @@ class Storage {
 
   protected:
     // ---- internal state ----
-    RowCount _mergeFanInRec;
-    RowCount _mergeFanOutRec;
+    RowCount _filled = 0; // updated by RunManager
+    // used for merging
+    RowCount _effectiveClusterSize = 0;
+    RowCount _filledInputClusters = 0;
+    RowCount _filledOutputClusters = 0;
+    RowCount _totalSpaceInInputClusters = 0;  // setup before merging
+    RowCount _totalSpaceInOutputClusters = 0; // setup before merging
 
   public:
     Storage(std::string name, ByteCount capacity, int bandwidth, double latency);
@@ -49,37 +53,93 @@ class Storage {
     // setup
     void configure();
 
-    // getters
+    // ---- getters ----
+    std::string getName() const { return name; }
     ByteCount getCapacityInBytes() const { return CAPACITY_IN_BYTES; }
     RowCount getCapacityInRecords() const { return CAPACITY_IN_BYTES / Config::RECORD_SIZE; }
     ByteCount getPageSizeInBytes() const { return PAGE_SIZE_IN_RECORDS * Config::RECORD_SIZE; }
     RowCount getPageSizeInRecords() const { return PAGE_SIZE_IN_RECORDS; }
-    PageCount getClusterSize() const { return CLUSTER_SIZE; }
+    PageCount getClusterSizeInPages() const { return CLUSTER_SIZE; }
     int getMergeFanIn() const { return MERGE_FAN_IN; }
     int getMergeFanOut() const { return MERGE_FAN_OUT; }
-    RowCount getMergeFanInRecords() const { return _mergeFanInRec; }
-    RowCount getMergeFanOutRecords() const { return _mergeFanOutRec; }
+    RowCount getMergeFanInRecords() const { return MERGE_FANIN_IN_RECORDS; }
+    RowCount getMergeFanOutRecords() const { return MERGE_FANOUT_IN_RECORDS; }
     std::string getReadFilePath() const { return readFilePath; }
     std::string getWriteFilePath() const { return writeFilePath; }
-    std::string getName() const { return name; }
-
     // time calculations in ms
-    double getAccessTimeInSec(int nRecords) const;
-    int getAccessTimeInMillis(int nRecords) const;
-    // double getWriteTimeInMillis(int nRecords) const;
+    double getAccessTimeInSec(RowCount nRecords) const {
+        return this->LATENCY + (nRecords * Config::RECORD_SIZE) / this->BANDWIDTH;
+    }
+    int getAccessTimeInMillis(RowCount nRecords) const {
+        return (int)(this->getAccessTimeInSec(nRecords) * 1000);
+    }
 
-    // file operations
+    // ---- state ----
+    RowCount getTotalEmptySpaceInRecords() {
+        return getCapacityInRecords() - getTotalFilledSpaceInRecords();
+    }
+    RowCount getTotalFilledSpaceInRecords() {
+        return _filled + _filledInputClusters + _filledOutputClusters;
+    }
+    void storeMore(RowCount nRecords) { _filled += nRecords; }
+    void freeMore(RowCount nRecords) { _filled -= nRecords; }
+    void resetAllFilledSpace() {
+        _filled = 0;
+        _filledInputClusters = 0;
+        _filledOutputClusters = 0;
+    }
+    std::string reprUsageDetails() {
+        std::string state = "\n\t" + this->name + " usage details: ";
+        state += "\n\t\t_filled: " + std::to_string(_filled) + " records";
+        state += "\n\t\tinputcluster: " + std::to_string(_filledInputClusters) + " out of " +
+                 std::to_string(_totalSpaceInInputClusters) + " records, ";
+        state += "\n\t\toutputcluster: " + std::to_string(_filledOutputClusters) + " out of " +
+                 std::to_string(_totalSpaceInOutputClusters) + " records";
+        state +=
+            "\n\t\teffective cluster size: " + std::to_string(_effectiveClusterSize) + " records";
+        RowCount totalFilled = _filledInputClusters + _filledOutputClusters + _filled;
+        state += "\n\t\ttotal filled: " + std::to_string(totalFilled) + " records";
+        state += "\n\t\ttotal capacity: " + std::to_string(getCapacityInRecords()) + " records";
+        return state;
+    }
+    // ---- merging state ----
+    void setupMergingState(RowCount totalInputRecords, RowCount totalOutputRecords,
+                           RowCount effectiveClusterSize) {
+        _totalSpaceInInputClusters = totalInputRecords;
+        _totalSpaceInOutputClusters = totalOutputRecords;
+        _effectiveClusterSize = effectiveClusterSize;
+        _filledInputClusters = 0;
+        _filledOutputClusters = 0;
+    }
+    void fillInputCluster(RowCount nRecords) { _filledInputClusters += nRecords; }
+    void fillOutputCluster(RowCount nRecords) { _filledOutputClusters += nRecords; }
+    void freeInputCluster(RowCount nRecords) { _filledInputClusters -= nRecords; }
+    void freeOutputCluster(RowCount nRecords) { _filledOutputClusters -= nRecords; }
+    void getMergingState(RowCount &filledInputClusters, RowCount &filledOutputClusters) {
+        filledInputClusters = _filledInputClusters;
+        filledOutputClusters = _filledOutputClusters;
+    }
+    void getEmptySpaceInClusters(RowCount &emptyInputClusters, RowCount &emptyOutputClusters) {
+        emptyInputClusters = _totalSpaceInInputClusters - _filledInputClusters;
+        emptyOutputClusters = _totalSpaceInOutputClusters - _filledOutputClusters;
+    }
+    RowCount getEmptySpaceInInputClusters() {
+        return _totalSpaceInInputClusters - _filledInputClusters;
+    }
+    RowCount getEmptySpaceInOutputClusters() {
+        return _totalSpaceInOutputClusters - _filledOutputClusters;
+    }
+    RowCount getFilledSpaceInInputClusters() { return _filledInputClusters; }
+    RowCount getFilledSpaceInOutputClusters() { return _filledOutputClusters; }
+    RowCount getFilledSpace() { return _filledInputClusters + _filledOutputClusters; }
+
+    // ---- file operations ----
     bool readFrom(const std::string &filePath);
     bool writeTo(const std::string &filePath);
     std::streampos getReadPosition() { return readFile.tellg(); }
-    std::streampos getWritePosition() { return writeFile.tellp(); }
+    // std::streampos getWritePosition() { return writeFile.tellp(); }
     char *readRecords(RowCount *nRecords);
     // RowCount writeRecords(char *data, RowCount nRecords);
-
-    std::vector<Page *> readNext(int nPages);
-    void writeNext(std::vector<Page *> pages);
-    int readPage(std::ifstream &file, Page *page);
-
     // cleanup
     void closeRead();
     void closeWrite();
@@ -113,13 +173,11 @@ class RunManager {
     std::vector<std::string> getRunInfoFromDir();
 
     // operations
-    void storeRun(std::vector<Page *> &pages);
-    void storeRun(Run &run);
-    std::vector<Page *> loadRun(const std::string &runFilename, int pageSize);
-    void deleteRun(const std::string &runFilename);
-
-    // validation
-    void validateRun(const std::string &runFilename, int pageSize);
+    RowCount storeRun(Run &run);
+    // void storeRun(std::vector<Page *> &pages);
+    // std::vector<Page *> loadRun(const std::string &runFilename, int pageSize);
+    // void validateRun(const std::string &runFilename, int pageSize);
+    // void deleteRun(const std::string &runFilename);
 
     char *repr() {
         std::string repr = storage->getName() + "RunManager: ";
@@ -132,12 +190,54 @@ class RunManager {
 };
 
 
+// =========================================================
+// ----------------------- RunStreamer ---------------------
+// =========================================================
+
+
+/**
+ * @brief RunStreamer is a class to stream records from a run
+ * It can be used to stream records from a run in memory or from a file
+ * If the run is in memory, it will stream records from the run
+ * If the run is on disk, it will stream records from the file
+ */
+class RunStreamer {
+  private:
+    Record *currentRecord;
+    // if reader is not null, it will stream records from file
+    // otherwise, it will stream records until currentRecord->next is null
+    RunReader *reader;
+    Storage *device;
+    Page *currentPage;
+    int readAhead = 1;
+    // read ahead pages
+    RowCount readAheadPages(int nPages);
+
+  public:
+    RunStreamer(Run *run);
+    RunStreamer(RunReader *reader, Storage *device, int readAhead = 1);
+
+    // getters
+    Record *getCurrRecord() { return currentRecord; }
+    Record *moveNext();
+
+    // default comparison based on first 8 bytes of data
+    bool operator<(const RunStreamer &other) const { return *currentRecord < *other.currentRecord; }
+    bool operator>(const RunStreamer &other) const { return *currentRecord > *other.currentRecord; }
+    // equality comparison based on all bytes of data
+    bool operator==(const RunStreamer &other) const {
+        return *currentRecord == *other.currentRecord;
+    }
+
+    char *repr() { return currentRecord->reprKey(); }
+}; // class RunStreamer
+
+
 // ==================================================================
 // ------------------------------ Disk ------------------------------
 // ==================================================================
 
 class HDD : public Storage {
-
   private:
     static HDD *instance;
     RunManager *runManager;
@@ -160,9 +260,18 @@ class HDD : public Storage {
         }
     }
 
+    void storeRun(Run &run) {
+        if (getTotalEmptySpaceInRecords() < run.getSize()) {
+            throw std::runtime_error(this->getName() + " is full, cannot store run");
+        }
+        RowCount nRecords = runManager->storeRun(run);
+        this->storeMore(nRecords);
+    }
+
+
     // getters
-    RunManager *getRunManager() { return runManager; }
-    RowCount getEmptySpaceInRecords();
+    // RunManager *getRunManager() { return runManager; }
+    std::string reprStoredRuns() { return runManager->repr(); }
 };
 
 // ==================================================================
@@ -185,8 +294,7 @@ class SSD : public HDD {
     }
     ~SSD() {}
     // getters
-    RunManager *getRunManager() { return runManager; }
-    RowCount getEmptySpaceInRecords();
+    // RunManager *getRunManager() { return runManager; }
     void spillRunsToHDD(HDD *hdd);
 };
 
@@ -199,12 +307,12 @@ class DRAM : public Storage {
   private:
     // char *buffer;
     static DRAM *instance;
+
+    // ---- internal state for generating mini-runs ----
     RowCount _cacheSize;
-    // linked list of Records // for loading records
-    Record *_head;
+    Record *_head; // linked list of Records for loading records
     Record *_tail;
-    // Current runs in DRAM
-    std::vector<Run> _miniruns;
+    std::vector<Run> _miniruns; // Current runs in DRAM
 
     DRAM();
 
@@ -218,16 +326,19 @@ class DRAM : public Storage {
 
     ~DRAM() { // delete[] buffer;
     }
-    void resetRecords() {
+    void reset() {
         _head = nullptr;
         _tail = nullptr;
+        _miniruns.clear();
+        this->resetAllFilledSpace();
     }
     void loadRecordsToDRAM(char *data, RowCount nRecords);
     /**
      * @brief will mess up the head and tail pointers
      */
     void genMiniRuns(RowCount nRecords);
-    void mergeMiniRuns(RunManager *runManager);
+    void mergeMiniRuns(HDD *outputStorage);
 };
+
 
 #endif // _STORAGE_H_
