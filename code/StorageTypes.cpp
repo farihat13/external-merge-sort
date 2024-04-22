@@ -15,9 +15,9 @@ HDD::HDD(std::string name, ByteCount capacity, int bandwidth, double latency)
     : Storage(name, capacity, bandwidth, latency) {}
 
 RowCount HDD::storeRun(Run &run) {
-
     RunWriter *writer = getRunWriter();
     RowCount nRecords = writer->writeNextRun(run);
+    _filled += nRecords;
     closeWriter(writer);
     return nRecords;
 }
@@ -47,34 +47,17 @@ void HDD::setupMergeState(RowCount outputDevicePageSize, int fanIn) {
     _filledOutputClusters = 0;
 }
 
-// RowCount storeRun(Run &run) {
-//     if (getTotalEmptySpaceInRecords() < run.getSize()) {
-//         printvv("ERROR: Run size %lld exceeds storage empty space\n", run.getSize());
-//         printvv("%s\n", reprUsageDetails().c_str());
-//         throw std::runtime_error(this->getName() + " is full, cannot store run");
-//     }
-//     RunWriter *writer = getRunWriter();
-//     RowCount nRecords = writer->writeNextRun(run);
-//     if (nRecords != run.getSize()) {
-//         printvv("ERROR: Writing %lld records, expected %lld\n", nRecords, run.getSize());
-//         throw std::runtime_error("Error: Writing run to file");
-//     }
-//     runManager->addRunFile(writer->getFilename(), nRecords);
-//     _filled += nRecords;
-//     // this->storeMore(nRecords);
-//     writer->close();
-//     delete writer;
-//     return nRecords;
-// }
-
 
 // =========================================================
 // -------------------------- SSD -------------------------
 // =========================================================
 
+
 SSD *SSD::instance = nullptr;
 
-SSD::SSD() : HDD(SSD_NAME, Config::SSD_CAPACITY, Config::SSD_BANDWIDTH, Config::SSD_LATENCY) {}
+SSD::SSD() : HDD(SSD_NAME, Config::SSD_CAPACITY, Config::SSD_BANDWIDTH, Config::SSD_LATENCY) {
+    this->setSpillTo(HDD::getInstance());
+}
 
 
 /**
@@ -90,7 +73,7 @@ void getConstants(SSD *ssd, RowCount &ssdPageSize, RowCount &hddPageSize, RowCou
 }
 
 
-void SSD::spillRunsToHDD(HDD *hdd) {
+void SSD::mergeRuns(HDD *outputDevice) {
     TRACE(true);
 
     DRAM *_dram = DRAM::getInstance();
@@ -102,6 +85,7 @@ void SSD::spillRunsToHDD(HDD *hdd) {
     printv("%s\n", _ssd->reprUsageDetails().c_str());
     printv("%s\n\n", _hdd->reprUsageDetails().c_str());
     // validate the total runsize does not exceed merge fan-in
+    printv("runManager total records %lld\n", this->runManager->getTotalRecords());
     assert(this->runManager->getTotalRecords() == this->_filled);
     if (this->_filled > getMergeFanInRecords()) {
         printvv("ERROR: Run size %lld exceeds merge fan-in %lld\n", this->_filled,
@@ -161,6 +145,7 @@ void SSD::spillRunsToHDD(HDD *hdd) {
      * 3. loaded runs fit in DRAM, merge them
      * 4. when the merged run size fills the output buffer size, store the run in HDD
      */
+    RowCount allRunTotal = this->runManager->getTotalRecords();
     LoserTree loserTree;
     loserTree.constructTree(runStreamers);
     RunWriter *writer = _ssd->getRunWriter();
@@ -179,10 +164,16 @@ void SSD::spillRunsToHDD(HDD *hdd) {
         current = current->next;
         nSorted++;
         runningCount++;
+        if (nSorted > allRunTotal) {
+            printvv("ERROR: Merged run size exceeds %lld\n", allRunTotal);
+            throw std::runtime_error("Merged run size exceeds");
+        }
         if (runningCount >= totalOutBufSizeDram) {
             // write the sorted records to SSD
             Run merged(head->next, runningCount);
-            RowCount nRecord = writer->writeNextRun(merged);
+            RowCount nRecord = writeNextChunk(writer, merged);
+            printv("\tSTATE -> Merging runs, writing %llu records in output buffer to %s\n",
+                   runningCount, writer->getFilename().c_str());
             printv("\tACCESS -> A write to %s was made with size %llu bytes and latency %d ms\n",
                    _ssd->getName().c_str(), runningCount * Config::RECORD_SIZE,
                    getAccessTimeInMillis(runningCount));
@@ -196,11 +187,14 @@ void SSD::spillRunsToHDD(HDD *hdd) {
             current = head;
             runningCount = 0;
         }
+        flushv();
     }
     if (runningCount > 0) {
         /* write the remaining records */
         Run merged(head->next, runningCount);
-        RowCount nRecord = writer->writeNextRun(merged);
+        RowCount nRecord = writeNextChunk(writer, merged);
+        printv("\tSTATE -> Merged runs, writing final output buffer to %s\n",
+               writer->getFilename().c_str());
         printv("\tACCESS -> A write to %s was made with size %llu bytes and latency %d ms\n",
                _ssd->getName().c_str(), runningCount * Config::RECORD_SIZE,
                getAccessTimeInMillis(runningCount));
@@ -278,6 +272,7 @@ DRAM *DRAM::instance = nullptr;
 
 DRAM::DRAM()
     : Storage(DRAM_NAME, Config::DRAM_CAPACITY, Config::DRAM_BANDWIDTH, Config::DRAM_LATENCY) {
+    this->spillTo = SSD::getInstance();
     this->reset();
 }
 
@@ -498,7 +493,7 @@ void DRAM::mergeMiniRuns(HDD *outputStorage) {
         if (runningCount >= _totalSpaceInOutputClusters) {
             /* write the sorted records to SSD */
             Run merged(head->next, runningCount);
-            RowCount nRecord = writer->writeNextRun(merged);
+            RowCount nRecord = outputStorage->writeNextChunk(writer, merged);
             assert(nRecord == runningCount && "ERROR: Writing run to file");
             printv("\tACCESS -> A write to %s was made with size %llu bytes and latency %d ms\n",
                    outputStorage->getName().c_str(), runningCount * Config::RECORD_SIZE,
@@ -512,7 +507,7 @@ void DRAM::mergeMiniRuns(HDD *outputStorage) {
     if (runningCount > 0) {
         /* write the remaining records */
         Run merged(head->next, runningCount);
-        RowCount nRecord = writer->writeNextRun(merged);
+        RowCount nRecord = outputStorage->writeNextChunk(writer, merged);
         assert(nRecord == runningCount && "ERROR: Writing remains of run to file");
         printv("\tACCESS -> A write to %s was made with size %llu bytes and latency %d ms\n",
                outputStorage->getName().c_str(), runningCount * Config::RECORD_SIZE,
@@ -521,6 +516,9 @@ void DRAM::mergeMiniRuns(HDD *outputStorage) {
     /* update the SSD used space */
     outputStorage->closeWriter(writer);
     printv("DEBUG: Merged %lld records in DRAM\n", nSorted);
+
+    assert(outputStorage->getTotalFilledSpaceInRecords() >= nSorted &&
+           "ERROR: outputStorage filled space mismatch");
 
 #if defined(_VALIDATE)
     if (nSorted != keepNRecords) {

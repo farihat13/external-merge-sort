@@ -187,19 +187,28 @@ class RunReader {
         if (!_is) {
             throw std::runtime_error("Cannot open file: " + filename);
         }
-        printv("\t\t\tDEBUG: RunReader opened '%s'\n", filename.c_str());
+        printv("\t\t\tRunReader opened '%s'\n", filename.c_str());
     }
     ~RunReader() {
         if (_is.is_open()) {
             _is.close();
         }
-        printv("\t\t\tDEBUG: RunReader destroyed '%s'\n", filename.c_str());
+        printv("\t\t\tRunReader destroyed '%s'\n", filename.c_str());
     }
     void close() {
         if (_is.is_open()) {
             _is.close();
         }
-        printv("\t\t\tDEBUG: RunReader closed '%s'\n", filename.c_str());
+        printv("\t\t\tRunReader closed '%s'\n", filename.c_str());
+    }
+    void deleteFile() {
+        if (_is.is_open()) {
+            _is.close();
+        }
+        if (std::remove(filename.c_str()) != 0) {
+            throw std::runtime_error("Error deleting file: " + filename);
+        }
+        printv("\t\t\tDEBUG: RunWriter deleted '%s'\n", filename.c_str());
     }
     Page *readNextPage();
     // std::vector<Page *> readNextPages(int nPages);
@@ -230,29 +239,41 @@ class RunWriter {
         if (!os) {
             throw std::runtime_error("Cannot open file: " + filename);
         }
-        printv("\t\t\tDEBUG: RunWriter opened '%s'\n", filename.c_str());
+        printv("\t\t\tRunWriter opened '%s'\n", filename.c_str());
     }
 
     ~RunWriter() {
         if (os.is_open()) {
             os.close();
         }
-        printv("\t\t\tDEBUG: RunWriter destroyed '%s'\n", filename.c_str());
+        printv("\t\t\tRunWriter destroyed '%s'\n", filename.c_str());
     }
 
     RowCount writeNextPage(Page *page);
-    // RowCount writeNextPages(std::vector<Page *> &pages);
     RowCount writeNextRun(Run &run);
-
-    // ---- getters ----
-    std::string getFilename() { return filename; }
-    RowCount getCurrSize() { return currSize; }
+    RowCount writeFromFile(std::string filename, RowCount toCopyNRecords);
+    void reset() {
+        if (os.is_open()) {
+            os.close();
+        }
+        // truncate the file to 0 bytes
+        os.open(filename, std::ios::binary | std::ios::trunc);
+        if (!os) {
+            throw std::runtime_error("Cannot open file: " + filename);
+        }
+        currSize = 0;
+        printv("\t\t\tRunWriter reset '%s'\n", filename.c_str());
+    }
     void close() {
         if (os.is_open()) {
             os.close();
         }
-        printv("\t\t\tDEBUG: RunWriter closed '%s'\n", filename.c_str());
+        printv("\t\t\tRunWriter closed '%s'\n", filename.c_str());
     }
+    // ---- getters ----
+    std::string getFilename() { return filename; }
+    RowCount getCurrSize() { return currSize; }
+
 }; // class RunWriter
 
 

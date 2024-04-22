@@ -88,10 +88,18 @@ class Storage {
     RowCount _filledOutputClusters = 0;
     RowCount _totalSpaceInInputClusters = 0;  // setup before merging
     RowCount _totalSpaceInOutputClusters = 0; // setup before merging
+    // assumption: spill amount will always be less than capacity
+    Storage *spillTo = nullptr; // used for merging
+    //----- spill session ----
+    RunWriter *spillWriter = nullptr;
 
     // setup
     Storage(std::string name, ByteCount capacity, int bandwidth, double latency);
     void configure();
+    void setSpillTo(Storage *spillTo) {
+        this->spillTo = spillTo;
+        printv("%s set SpillTo to %s\n", this->getName().c_str(), spillTo->getName().c_str());
+    }
 
   public:
     // ------------------------ configurations ---------------------------------
@@ -132,13 +140,13 @@ class Storage {
     RowCount getFilledSpaceInInputClusters() { return _filledInputClusters; }
     RowCount getFilledSpaceInOutputClusters() { return _filledOutputClusters; }
     // setters
-    void fillMore(RowCount nRecords) {
+    void fillupSpace(RowCount nRecords) {
         if (_filled + nRecords > getCapacityInRecords()) {
             throw std::runtime_error("ERROR: filling more records than capacity in " + this->name);
         }
         _filled += nRecords;
     }
-    void freeSome(RowCount nRecords) {
+    void freeSpace(RowCount nRecords) {
         if (_filled - nRecords < 0) {
             throw std::runtime_error("ERROR: freeing more records than filled in " + this->name);
         }
@@ -184,6 +192,9 @@ class Storage {
     RunWriter *getRunWriter();
     RowCount writeNextChunk(RunWriter *writer, Run &run);
     void closeWriter(RunWriter *writer);
+    // ---- spill session ----
+    RunWriter *startSpillSession();
+    void endSpillSession();
 
     // ---------------------------- printing -----------------------------------
     std::string reprUsageDetails();
@@ -212,6 +223,7 @@ class RunStreamer {
     Storage *toDevice;
     Page *currentPage;
     PageCount readAhead = 1;
+    bool deleteReader = false; // if true, delete reader after streaming
     // read ahead pages
     RowCount readAheadPages(int nPages);
 
