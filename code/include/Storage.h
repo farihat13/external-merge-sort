@@ -209,6 +209,7 @@ class Storage {
         runManager->addRunFile(filename, nRecords);
     }
     // ---- spill session ----
+    void spill(RunWriter *writer);
     RunWriter *startSpillSession();
     void endSpillSession(RunWriter *writer, bool deleteCurrFile = false);
 
