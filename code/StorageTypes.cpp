@@ -1,6 +1,5 @@
 
 #include "StorageTypes.h"
-#include "Losertree.h"
 
 
 // =========================================================
@@ -156,9 +155,7 @@ void SSD::mergeRuns(HDD *outputDevice) {
     RowCount runningCount = 0;
     while (true) {
         Record *winner = loserTree.getNext();
-        if (winner == NULL) {
-            break;
-        }
+        if (winner == NULL) { break; }
         flushv();
         current->next = winner;
         current = current->next;
@@ -204,11 +201,22 @@ void SSD::mergeRuns(HDD *outputDevice) {
      *  5. update the SSD used space
      **/
     _ssd->closeWriter(writer);
+    // delete the run file entries from the run manager
+    // the actual files has already been deleted by the runreader and endspillsession
+    for (auto runFile : runFiles) {
+        std::string runFilename = runFile.first;
+        this->runManager->removeRunFile(runFilename);
+    }
     _dram->reset();
 
+    // print all device information
     printv("STATE -> Merged %lld records in SSD\n", nSorted);
     printv("%s\n", _ssd->reprUsageDetails().c_str());
     printv("%s\n", _dram->reprUsageDetails().c_str());
+    printv("%s\n", _hdd->reprUsageDetails().c_str());
+    // print stored runs in ssd and hdd
+    _ssd->printStoredRunFiles();
+    _hdd->printStoredRunFiles();
 
     exit(0);
 
@@ -378,9 +386,7 @@ void DRAM::genMiniRuns(RowCount nRecords) {
         }
         quickSort(records);
         // update the next pointer
-        for (int j = 0; j < records.size() - 1; j++) {
-            records[j]->next = records[j + 1];
-        }
+        for (int j = 0; j < records.size() - 1; j++) { records[j]->next = records[j + 1]; }
         records.back()->next = nullptr;
         // create a run
         Run run(records[0], records.size());
@@ -476,9 +482,7 @@ void DRAM::mergeMiniRuns(HDD *outputStorage) {
     RowCount runningCount = 0;
     while (true) {
         Record *winner = loserTree.getNext();
-        if (winner == NULL) {
-            break;
-        }
+        if (winner == NULL) { break; }
         // printv("\t\tWinner: %s\n", winner->reprKey());
         flushv();
         // winner->next = nullptr;
