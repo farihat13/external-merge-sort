@@ -80,7 +80,7 @@ class Run {
     char *getAllData() {
         char *buffer = new char[size * Config::RECORD_SIZE];
         Record *curr = runHead;
-        for (int i = 0; i < size; i++) {
+        for (RowCount i = 0; i < size; i++) {
             std::memcpy(buffer + i * Config::RECORD_SIZE, curr->data, Config::RECORD_SIZE);
             curr = curr->next;
         }
@@ -115,9 +115,7 @@ class Page {
      * This constructor will NOT allocate memory for records
      */
     Page(RowCount capacityInRecords) : capacity(capacityInRecords) {
-        if (capacity < 0) {
-            throw std::runtime_error("Error: Page capacity cannot be negative");
-        }
+        if (capacity < 0) { throw std::runtime_error("Error: Page capacity cannot be negative"); }
         this->records.reserve(capacity);
         this->next = nullptr;
     }
@@ -185,30 +183,22 @@ class RunReader {
     RunReader(const std::string &filename, RowCount filesize, RowCount pageSizeInRecords)
         : filename(filename), filesize(filesize), PAGE_SIZE_IN_RECORDS(pageSizeInRecords),
           _is(filename, std::ios::binary) {
-        if (!_is) {
-            throw std::runtime_error("Cannot open file: " + filename);
-        }
+        if (!_is) { throw std::runtime_error("Cannot open file: " + filename); }
         printv("\t\t\t\tRunReader opened '%s'\n", filename.c_str());
     }
     ~RunReader() {
-        if (_is.is_open()) {
-            _is.close();
-        }
+        if (_is.is_open()) { _is.close(); }
         printv("\t\t\t\tRunReader destroyed '%s'\n", filename.c_str());
     }
     void close() {
         if (!_isDeleted) {
-            if (_is.is_open()) {
-                _is.close();
-            }
+            if (_is.is_open()) { _is.close(); }
         }
         printv("\t\t\t\tRunReader closed '%s'\n", filename.c_str());
     }
     void deleteFile() {
         if (!_isDeleted) {
-            if (_is.is_open()) {
-                _is.close();
-            }
+            if (_is.is_open()) { _is.close(); }
             if (std::remove(filename.c_str()) != 0) {
                 throw std::runtime_error("Error deleting file: " + filename);
             }
@@ -244,16 +234,12 @@ class RunWriter {
   public:
     RunWriter(const std::string &filename)
         : _filename(filename), _os(filename, std::ios::binary | std::ios::trunc) {
-        if (!_os) {
-            throw std::runtime_error("Cannot open file: " + filename);
-        }
+        if (!_os) { throw std::runtime_error("Cannot open file: " + filename); }
         printv("\t\t\t\tRunWriter opened '%s'\n", filename.c_str());
     }
 
     ~RunWriter() {
-        if (_os.is_open()) {
-            _os.close();
-        }
+        if (_os.is_open()) { _os.close(); }
         printv("\t\t\t\tRunWriter destroyed '%s'\n", _filename.c_str());
     }
 
@@ -261,30 +247,22 @@ class RunWriter {
     RowCount writeNextRun(Run &run);
     RowCount writeFromFile(std::string filename, RowCount toCopyNRecords);
     void reset() {
-        if (_os.is_open()) {
-            _os.close();
-        }
+        if (_os.is_open()) { _os.close(); }
         // truncate the file to 0 bytes
         _os.open(_filename, std::ios::binary | std::ios::trunc);
-        if (!_os) {
-            throw std::runtime_error("Cannot open file: " + _filename);
-        }
+        if (!_os) { throw std::runtime_error("Cannot open file: " + _filename); }
         currSize = 0;
         printv("\t\t\t\tRunWriter RESET '%s'\n", _filename.c_str());
     }
     void close() {
         if (!_isDeleted) {
-            if (_os.is_open()) {
-                _os.close();
-            }
+            if (_os.is_open()) { _os.close(); }
         }
         printv("\t\t\t\tRunWriter closed '%s'\n", _filename.c_str());
     }
     void deleteFile() {
         if (!_isDeleted) {
-            if (_os.is_open()) {
-                _os.close();
-            }
+            if (_os.is_open()) { _os.close(); }
             if (std::remove(_filename.c_str()) != 0) {
                 throw std::runtime_error("Error deleting file: " + _filename);
             }

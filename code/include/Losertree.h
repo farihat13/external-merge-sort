@@ -33,10 +33,8 @@ class LoserTree {
     }
 
     ~LoserTree() {
-        for (int i = 0; i < loserTree.size(); i++) {
-            if (loserTree[i] != dummy) {
-                delete loserTree[i];
-            }
+        for (RowCount i = 0; i < loserTree.size(); i++) {
+            if (loserTree[i] != dummy) { delete loserTree[i]; }
         }
         printv("\t\t\t\tDeleted loser tree (%s)\n", name.c_str());
     }
@@ -45,7 +43,7 @@ class LoserTree {
     char *repr() {
         std::stringstream ss;
         ss << "loser tree (" << name << "):";
-        for (int i = 0; i < loserTree.size(); i++) {
+        for (size_t i = 0; i < loserTree.size(); i++) {
             if (i < indices.size())
                 ss << "[" << i << "]:" << loserTree[i]->repr() << "(" << indices[i] << ") ";
             else
@@ -59,7 +57,7 @@ class LoserTree {
 
     void constructTree(std::vector<Run> &inputs) {
         std::vector<RunStreamer *> runStreamers;
-        for (int i = 0; i < inputs.size(); i++) {
+        for (size_t i = 0; i < inputs.size(); i++) {
             runStreamers.push_back(new RunStreamer(&inputs[i]));
         }
         constructTree(runStreamers);
@@ -67,14 +65,12 @@ class LoserTree {
 
     void constructTree(std::vector<RunStreamer *> &inputs) {
         int nInternalNodes = inputs.size();
-        if (inputs.size() % 2 == 1) {
-            nInternalNodes++;
-        }
+        if (inputs.size() % 2 == 1) { nInternalNodes++; }
         this->loserTree.resize(nInternalNodes * 2, dummy);
         this->indices.resize(nInternalNodes, -1);
 
         // Set the leaf values using the first elements of the lists
-        for (int i = nInternalNodes; i < nInternalNodes + inputs.size(); i++) {
+        for (size_t i = nInternalNodes; i < nInternalNodes + inputs.size(); i++) {
             this->loserTree[i] = inputs[i - nInternalNodes];
             if (this->loserTree[i] == NULL) {
                 printvv("ERROR: Did not expect empty list\n");
@@ -103,9 +99,7 @@ class LoserTree {
                     std::swap(this->loserTree[parIdx], winner);
                     std::swap(this->indices[parIdx], winnerIdx);
                 }
-                if (parIdx == 0) {
-                    break;
-                }
+                if (parIdx == 0) { break; }
             }
         }
         // printvv("Constructed loser tree (%s), size: %zu (#internal %zu)\n", name.c_str(),
@@ -139,9 +133,7 @@ class LoserTree {
         // to the found leaf
         // loserTree[winningIdx] = loserTree[winningIdx]->next;
         Record *nextRecord = loserTree[winningIdx]->moveNext();
-        if (nextRecord == NULL) {
-            loserTree[winningIdx] = dummy;
-        }
+        if (nextRecord == NULL) { loserTree[winningIdx] = dummy; }
         // if (loserTree[winningIdx] == NULL) {
         //     loserTree[winningIdx] = dummy;
         // } else {
@@ -189,9 +181,7 @@ class LoserTree {
         Record *current = head;
         while (true) {
             Record *winner = getNext();
-            if (winner == NULL) {
-                break;
-            }
+            if (winner == NULL) { break; }
             // printf("winner: %d\n", winner->val);
             current->next = winner;
             current = current->next;
