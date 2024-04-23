@@ -1,3 +1,6 @@
+#ifndef _STORAGE_TYPES_H_
+#define _STORAGE_TYPES_H_
+
 #include "Losertree.h"
 
 
@@ -29,7 +32,12 @@ class HDD : public Storage {
 
     void setupMergeState(RowCount outputDevicePageSize, int fanIn);
     int setupMergeStateForMiniruns(RowCount outputDevicePageSize);
+    void mergeRuns();
     RowCount storeRun(Run &run);
+    // ---- helper functions ----
+    void printStates(std::string where);
+    void getConstants(RowCount &ssdPageSize, RowCount &hddPageSize, RowCount &ssdCapacity,
+                      RowCount &ssdEmptySpace, RowCount &dramCapacity);
 };
 
 // ==================================================================
@@ -50,7 +58,7 @@ class SSD : public HDD {
         return instance;
     }
     ~SSD() {}
-    void mergeRuns(HDD *outputDevice);
+    void mergeSSDRuns(HDD *outputDevice);
 };
 
 // ==================================================================
@@ -87,10 +95,23 @@ class DRAM : public Storage {
         _miniruns.clear();
         this->resetAllFilledSpace();
     }
-    void loadRecordsToDRAM(char *data, RowCount nRecords);
+    // void loadRecordsToDRAM(char *data, RowCount nRecords);
+    RowCount loadInput(RowCount nRecords);
     /**
      * @brief will mess up the head and tail pointers
      */
     void genMiniRuns(RowCount nRecords);
     void mergeMiniRuns(HDD *outputStorage);
 };
+
+
+// =============================================================================
+// ------------------------------ CommonFunctions ------------------------------
+// =============================================================================
+
+
+int getDRAMAccessTime(RowCount nRecords);
+int getSSDAccessTime(RowCount nRecords);
+int getHDDAccessTime(RowCount nRecords);
+
+#endif // _STORAGE_TYPES_H_

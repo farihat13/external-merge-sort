@@ -1,6 +1,7 @@
 #include "Storage.h"
 #include "Losertree.h"
 #include <algorithm>
+#include <cmath>
 #include <vector>
 
 
@@ -52,7 +53,9 @@ RunManager::~RunManager() {
 
 std::string RunManager::getNextRunFileName() {
     struct stat st = {0};
-    if (stat(baseDir.c_str(), &st) == -1) { mkdir(baseDir.c_str(), 0777); }
+    if (stat(baseDir.c_str(), &st) == -1) {
+        mkdir(baseDir.c_str(), 0777);
+    }
     std::string filename = baseDir + "/r" + std::to_string(nextRunIndex++) + ".txt";
     return filename;
 }
@@ -68,7 +71,9 @@ std::vector<std::string> RunManager::getRunInfoFromDir() {
             struct stat path_stat;
             std::string filePath = baseDir + "/" + entry->d_name;
             stat(filePath.c_str(), &path_stat);
-            if (S_ISREG(path_stat.st_mode)) { runFiles.push_back(entry->d_name); }
+            if (S_ISREG(path_stat.st_mode)) {
+                runFiles.push_back(entry->d_name);
+            }
         }
         closedir(dir);
     }
@@ -102,7 +107,9 @@ Storage::Storage(std::string name, ByteCount capacity, int bandwidth, double lat
     printv("\tBandwidth %d MB/s, Latency %3.1lf ms\n", BYTE_TO_MB(BANDWIDTH), SEC_TO_MS(LATENCY));
 
     this->configure();
-    if (this->name != DRAM_NAME) { this->runManager = new RunManager(this->name); }
+    if (this->name != DRAM_NAME) {
+        this->runManager = new RunManager(this->name);
+    }
 }
 
 void Storage::configure() {
@@ -111,7 +118,7 @@ void Storage::configure() {
     // calculate the page size in records
     int nBytes = this->BANDWIDTH * this->LATENCY;
     nBytes = ROUNDUP_4K(nBytes);
-    this->PAGE_SIZE_IN_RECORDS = std::ceil(nBytes / Config::RECORD_SIZE);
+    this->PAGE_SIZE_IN_RECORDS = ceil(nBytes / Config::RECORD_SIZE);
 
     // calculate the cluster size in pages
     int nRecords = this->CAPACITY_IN_BYTES / Config::RECORD_SIZE;
@@ -137,7 +144,9 @@ void Storage::configure() {
 // ------------------------------- Run Management ------------------------------
 
 RunWriter *Storage::getRunWriter() {
-    if (runManager == nullptr) { throw std::runtime_error("ERROR: RunManager is not initialized"); }
+    if (runManager == nullptr) {
+        throw std::runtime_error("ERROR: RunManager is not initialized");
+    }
     std::string filename = runManager->getNextRunFileName();
     return new RunWriter(filename);
 }
@@ -148,7 +157,9 @@ void Storage::spill(RunWriter *writer) {
         printvv("ERROR: %s is full, no spillTo device\n", this->name.c_str());
         throw std::runtime_error("Error: Storage is full, no spillTo device");
     }
-    if (spillWriter == nullptr) { spillWriter = startSpillSession(); }
+    if (spillWriter == nullptr) {
+        spillWriter = startSpillSession();
+    }
     // close the current file
     writer->close();
     // copy the file content to spillWriter
@@ -163,9 +174,9 @@ void Storage::spill(RunWriter *writer) {
     writer->reset();
     // update the storage usage (free up the space in this storage)
     this->freeSpace(nRecord);
-    printv("STATE -> %s is full, spilled %lld to %s\n", this->name.c_str(), nRecord,
+    printv("\t\tSTATE -> %s is full, spilled %lld to %s\n", this->name.c_str(), nRecord,
            spillTo->name.c_str());
-    printv("ACCESS -> A write to %s was made with size %llu bytes and latency %d ms\n",
+    printv("\t\tACCESS -> A write to %s was made with size %llu bytes and latency %d ms\n",
            spillTo->getName().c_str(), nRecord * Config::RECORD_SIZE,
            spillTo->getAccessTimeInMillis(nRecord));
     flushv();
@@ -176,32 +187,6 @@ RowCount Storage::writeNextChunk(RunWriter *writer, Run &run) {
     RowCount _empty = this->getTotalEmptySpaceInRecords();
     if (run.getSize() > _empty) {
         spill(writer);
-        // if (this->spillTo == nullptr) {
-        //     printvv("ERROR: %s is full, no spillTo device\n", this->name.c_str());
-        //     throw std::runtime_error("Error: Storage is full, no spillTo device");
-        // }
-        // if (spillWriter == nullptr) { spillWriter = startSpillSession(); }
-        // // close the current file
-        // writer->close();
-        // // copy the file content to spillWriter
-        // RowCount nRecord = spillWriter->writeFromFile(writer->getFilename(),
-        // writer->getCurrSize()); if (nRecord != writer->getCurrSize()) {
-        //     printvv("ERROR: Failed to copy %lld records to %s\n", writer->getCurrSize(),
-        //             spillWriter->getFilename().c_str());
-        //     assert(nRecord == writer->getCurrSize() && "Failed to copy all records to
-        //     spillWriter");
-        // }
-        // spillTo->fillupSpace(nRecord);
-        // // reset the filesize to 0
-        // writer->reset();
-        // // update the storage usage (free up the space in this storage)
-        // _filled -= nRecord;
-        // printv("STATE -> %s is full, spilled %lld to %s\n", this->name.c_str(), nRecord,
-        //        spillTo->name.c_str());
-        // printv("ACCESS -> A write to %s was made with size %llu bytes and latency %d ms\n",
-        //        spillTo->getName().c_str(), nRecord * Config::RECORD_SIZE,
-        //        spillTo->getAccessTimeInMillis(nRecord));
-        // flushv();
     }
     /** assumption: spilling the current file to disk will free up enough space */
     RowCount nRecord = writer->writeNextRun(run);
@@ -232,18 +217,19 @@ void Storage::closeWriter(RunWriter *writer) {
 
 RunWriter *Storage::startSpillSession() {
     spillWriter = spillTo->getRunWriter();
+    printv("\t\t\tINFO: Spill writer created for %s\n", this->name.c_str());
     return spillWriter;
 }
 
 void Storage::endSpillSession(RunWriter *currDeviceWriter, bool deleteCurrFile) {
     if (spillWriter != nullptr) {
         if (currDeviceWriter != nullptr) {
-            printvv("DEBUG: Spilling leftovers of %s to %s\n", this->name.c_str(),
+            printvv("\t\t\tDEBUG: Spilling leftovers of %s to %s\n", this->name.c_str(),
                     spillTo->name.c_str());
             spill(currDeviceWriter);
             if (deleteCurrFile && (!currDeviceWriter->isDeletedFile())) {
                 this->freeSpace(currDeviceWriter->getCurrSize());
-                printv("freeing up %lld bytes\n", currDeviceWriter->getCurrSize());
+                printv("\t\t\tfreeing up %lld bytes\n", currDeviceWriter->getCurrSize());
                 flushv();
                 currDeviceWriter->close();
                 currDeviceWriter->deleteFile();
@@ -258,7 +244,7 @@ void Storage::endSpillSession(RunWriter *currDeviceWriter, bool deleteCurrFile) 
         spillWriter->close();
         delete spillWriter;
         spillWriter = nullptr;
-        printvv("INFO: Spill writer wrote %lld records\n", nRecords);
+        printv("\t\t\tINFO: Spill writer wrote %lld records. END\n", nRecords);
     }
 }
 
@@ -332,18 +318,21 @@ void Storage::closeWrite() {
 
 // ---------------------------- printing -----------------------------------
 std::string Storage::reprUsageDetails() {
-    std::string state = "\n\t" + this->name + " usage details: ";
-    state += "\n\t\t_filled: " + std::to_string(_filled) + " records";
-    state += "\n\t\tinputcluster: " + std::to_string(_filledInputClusters) + " out of " +
-             std::to_string(_totalSpaceInInputClusters) + " records, ";
-    state += "\n\t\toutputcluster: " + std::to_string(_filledOutputClusters) + " out of " +
+    std::string state = "\t\t\t" + this->name + " usage details: ";
+    state += "\n\t\t\t\t_filled (with runfiles): " + std::to_string(_filled) + " records";
+    state += "\n\t\t\t\tinputcluster: " + std::to_string(_filledInputClusters) + " out of " +
+             std::to_string(_totalSpaceInInputClusters) + " records";
+    state += ", outputcluster: " + std::to_string(_filledOutputClusters) + " out of " +
              std::to_string(_totalSpaceInOutputClusters) + " records";
-    state += "\n\t\teffective cluster size: " + std::to_string(_effectiveClusterSize) + " records";
-    state += "\n\t\ttotal filled: " + std::to_string(getTotalFilledSpaceInRecords()) + " records";
-    state += "\n\t\ttotal capacity: " + std::to_string(getCapacityInRecords()) + " records";
     state +=
-        "\n\t\ttotal empty space: " + std::to_string(getTotalEmptySpaceInRecords()) + " records";
-    if (runManager != nullptr) { state += "\n\t\t" + runManager->repr(); }
+        ", cluster size (bufsize per run): " + std::to_string(_effectiveClusterSize) + " records";
+    state +=
+        "\n\t\t\t\ttotal filled: " + std::to_string(getTotalFilledSpaceInRecords()) + " records";
+    state += " out of capacity: " + std::to_string(getCapacityInRecords()) + " records";
+    state += ", total empty space: " + std::to_string(getTotalEmptySpaceInRecords()) + " records";
+    if (runManager != nullptr) {
+        state += "\n\t\t\t" + runManager->repr();
+    }
     return state;
 }
 
@@ -354,10 +343,10 @@ void Storage::printStoredRunFiles() {
     }
     std::vector<std::pair<std::string, RowCount>> runFiles =
         runManager->getStoredRunsSortedBySize();
-    printv("INFO: %s has %d run files, totalRecords %lld\n", this->name.c_str(), runFiles.size(),
+    printv("\t\t\t%s has %d run files, totalRecords %lld\n", this->name.c_str(), runFiles.size(),
            runManager->getTotalRecords());
     for (auto &run : runFiles) {
-        printv("\t%s: %s\n", run.first.c_str(),
+        printv("\t\t\t\t%s: %s\n", run.first.c_str(),
                getSizeDetails(run.second * Config::RECORD_SIZE).c_str());
     }
 }
@@ -377,7 +366,9 @@ RunStreamer::RunStreamer(Run *run) : currentRecord(run->getHead()), reader(nullp
 RunStreamer::RunStreamer(RunReader *reader, Storage *fromDevice, Storage *toDevice,
                          PageCount readAhead)
     : reader(reader), fromDevice(fromDevice), toDevice(toDevice), readAhead(readAhead) {
-    if (readAhead < 1) { throw std::runtime_error("Error: ReadAhead should be at least 1"); }
+    if (readAhead < 1) {
+        throw std::runtime_error("Error: ReadAhead should be at least 1");
+    }
     RowCount nRecords = readAheadPages(readAhead);
     if (nRecords == 0) {
         throw std::runtime_error("Error: RunStreamer initialized with empty run");
@@ -416,8 +407,9 @@ RowCount RunStreamer::readAheadPages(int nPages) {
         page = p;
     }
     toDevice->fillInputCluster(nRecords);
-    printv("\tSTATE -> Read %lld records from %s\n", nRecords, reader->getFilename().c_str());
-    printv("\tACCESS -> A read from %s was made with size %llu bytes and latency %d ms\n",
+    printv("\t\t\t\tSTATE -> Read %lld records from %s using RS\n", nRecords,
+           reader->getFilename().c_str());
+    printv("\t\t\t\tACCESS -> A read from %s was made with size %llu bytes and latency %d ms\n",
            fromDevice->getName().c_str(), nRecords * Config::RECORD_SIZE,
            fromDevice->getAccessTimeInMillis(nRecords));
     return nRecords;
@@ -426,7 +418,9 @@ RowCount RunStreamer::readAheadPages(int nPages) {
 Record *RunStreamer::moveNext() {
     // if reader does not exist
     if (reader == nullptr) {
-        if (currentRecord->next == nullptr) { return nullptr; }
+        if (currentRecord->next == nullptr) {
+            return nullptr;
+        }
         currentRecord = currentRecord->next;
         return currentRecord;
     }
@@ -440,7 +434,9 @@ Record *RunStreamer::moveNext() {
         } else {
             // if no more page in memory, read next `readAhead` pages
             RowCount nRecords = readAheadPages(readAhead);
-            if (nRecords == 0) { return nullptr; }
+            if (nRecords == 0) {
+                return nullptr;
+            }
             currentRecord = currentPage->getFirstRecord();
         }
     } else {

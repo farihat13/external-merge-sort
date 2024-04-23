@@ -38,7 +38,7 @@ class LoserTree {
                 delete loserTree[i];
             }
         }
-        printvv("Deleted loser tree (%s)\n", name.c_str());
+        printv("\t\t\t\tDeleted loser tree (%s)\n", name.c_str());
     }
 
     // print the tree
@@ -120,7 +120,7 @@ class LoserTree {
         Record *currWinner = loserTree[0]->getCurrRecord();
         if (isRecordMax(currWinner)) {
             // if (currWinner->val == INT_MAX) {
-            printvv("No more winners\n");
+            printv("\t\t\t\tNo more winners\n");
             return NULL;
         }
 
