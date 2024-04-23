@@ -217,6 +217,7 @@ void SSD::mergeRuns(HDD *outputDevice) {
     // print stored runs in ssd and hdd
     _ssd->printStoredRunFiles();
     _hdd->printStoredRunFiles();
+    flushv();
 
     exit(0);
 

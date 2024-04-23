@@ -14,7 +14,7 @@ double Config::DRAM_LATENCY = 1.0 / (1000 * 1000);         // 10 microsecond
 int Config::DRAM_BANDWIDTH = 100 * 1024 * 1024;            // 100 GB/s
 // DRAM buffer size = 1 MB
 // ---- SSD ----
-ByteCount Config::SSD_CAPACITY = 1LL * 1024 * 1024 * 1024; // 10 GB TODO: change to 10GB
+ByteCount Config::SSD_CAPACITY = 1LL * 1024 * 1024 * 1024; // 512 MB TODO: change to 10GB
 double Config::SSD_LATENCY = 1.0 / (10 * 1000);            // 0.1 ms
 int Config::SSD_BANDWIDTH = 100 * 1024 * 1024;             // 100 MB/s
 // SSD buffer size = 10 MB
@@ -118,8 +118,7 @@ ByteCount getInputSizeInGB() { return getInputSizeInBytes() / (1024 * 1024 * 102
 
 std::string formatNum(uint64_t number) {
     bool isNegative = number < 0;
-    if (isNegative)
-        number = -number;
+    if (isNegative) number = -number;
 
     std::string suffix = "";
     double displayNumber = number;
@@ -141,13 +140,9 @@ std::string formatNum(uint64_t number) {
     size_t dotPos = result.find('.');
     if (dotPos != std::string::npos) {
         // Remove trailing zeros
-        while (result.back() == '0') {
-            result.pop_back();
-        }
+        while (result.back() == '0') { result.pop_back(); }
         // If the last character is the dot, remove it
-        if (result.back() == '.') {
-            result.pop_back();
-        }
+        if (result.back() == '.') { result.pop_back(); }
     }
 
     return (isNegative ? "-" : "") + result + suffix;
@@ -185,8 +180,7 @@ void Logger::writef(const char *format, ...) {
 
 void Assert(bool const predicate, char const *const file, int const line,
             char const *const function) {
-    if (predicate)
-        return;
+    if (predicate) return;
 
     fflush(stdout);
     fprintf(stderr, "failed assertion at %s:%d:%s\n", file, line, function);
@@ -208,17 +202,13 @@ void printVerbose(bool vv, char const *const file, int const line, char const *c
     va_start(args, format);
 
 #if defined(_USE_LOGFILE)
-    if (!logFile.is_open()) {
-        logFile.open("log.txt");
-    }
-    if (vv)
-        logFile << file << ":" << line << ":" << function << " ";
+    if (!logFile.is_open()) { logFile.open("log.txt"); }
+    if (vv) logFile << file << ":" << line << ":" << function << " ";
     char buffer[1024];
     vsnprintf(buffer, sizeof(buffer), format, args);
     logFile << buffer;
 #else
-    if (vv)
-        std::printf("%s:%d:%s\t", file, line, function);
+    if (vv) std::printf("%s:%d:%s\t", file, line, function);
     std::vprintf(format, args);
 #endif
 
@@ -228,8 +218,7 @@ void printVerbose(bool vv, char const *const file, int const line, char const *c
 
 void flushVerbose() {
 #if defined(_USE_LOGFILE)
-    if (logFile.is_open())
-        logFile.flush();
+    if (logFile.is_open()) logFile.flush();
 #else
     std::fflush(stdout);
 #endif

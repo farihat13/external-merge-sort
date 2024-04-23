@@ -143,28 +143,65 @@ RunWriter *Storage::getRunWriter() {
 }
 
 
+void Storage::spill(RunWriter *writer) {
+    if (this->spillTo == nullptr) {
+        printvv("ERROR: %s is full, no spillTo device\n", this->name.c_str());
+        throw std::runtime_error("Error: Storage is full, no spillTo device");
+    }
+    if (spillWriter == nullptr) { spillWriter = startSpillSession(); }
+    // close the current file
+    writer->close();
+    // copy the file content to spillWriter
+    RowCount nRecord = spillWriter->writeFromFile(writer->getFilename(), writer->getCurrSize());
+    if (nRecord != writer->getCurrSize()) {
+        printvv("ERROR: Failed to copy %lld records to %s\n", writer->getCurrSize(),
+                spillWriter->getFilename().c_str());
+        assert(nRecord == writer->getCurrSize() && "Failed to copy all records to spillWriter");
+    }
+    spillTo->fillupSpace(nRecord);
+    // reset the filesize to 0
+    writer->reset();
+    // update the storage usage (free up the space in this storage)
+    this->freeSpace(nRecord);
+    printv("STATE -> %s is full, spilled %lld to %s\n", this->name.c_str(), nRecord,
+           spillTo->name.c_str());
+    printv("ACCESS -> A write to %s was made with size %llu bytes and latency %d ms\n",
+           spillTo->getName().c_str(), nRecord * Config::RECORD_SIZE,
+           spillTo->getAccessTimeInMillis(nRecord));
+    flushv();
+}
+
+
 RowCount Storage::writeNextChunk(RunWriter *writer, Run &run) {
     RowCount _empty = this->getTotalEmptySpaceInRecords();
     if (run.getSize() > _empty) {
-        if (this->spillTo == nullptr) {
-            printvv("ERROR: %s is full, no spillTo device\n", this->name.c_str());
-            throw std::runtime_error("Error: Storage is full, no spillTo device");
-        }
-        if (spillWriter == nullptr) { spillWriter = startSpillSession(); }
-        // close the current file
-        writer->close();
-        // copy the file content to spillWriter
-        RowCount nRecord = spillWriter->writeFromFile(writer->getFilename(), writer->getCurrSize());
-        spillTo->fillupSpace(nRecord);
-        // reset the filesize to 0
-        writer->reset();
-        // update the storage usage (free up the space in this storage)
-        _filled -= nRecord;
-        printv("STATE -> %s is full, spilled to %s\n", this->name.c_str(), spillTo->name.c_str());
-        printv("ACCESS -> A write to %s was made with size %llu bytes and latency %d ms\n",
-               spillTo->getName().c_str(), nRecord * Config::RECORD_SIZE,
-               spillTo->getAccessTimeInMillis(nRecord));
-        flushv();
+        spill(writer);
+        // if (this->spillTo == nullptr) {
+        //     printvv("ERROR: %s is full, no spillTo device\n", this->name.c_str());
+        //     throw std::runtime_error("Error: Storage is full, no spillTo device");
+        // }
+        // if (spillWriter == nullptr) { spillWriter = startSpillSession(); }
+        // // close the current file
+        // writer->close();
+        // // copy the file content to spillWriter
+        // RowCount nRecord = spillWriter->writeFromFile(writer->getFilename(),
+        // writer->getCurrSize()); if (nRecord != writer->getCurrSize()) {
+        //     printvv("ERROR: Failed to copy %lld records to %s\n", writer->getCurrSize(),
+        //             spillWriter->getFilename().c_str());
+        //     assert(nRecord == writer->getCurrSize() && "Failed to copy all records to
+        //     spillWriter");
+        // }
+        // spillTo->fillupSpace(nRecord);
+        // // reset the filesize to 0
+        // writer->reset();
+        // // update the storage usage (free up the space in this storage)
+        // _filled -= nRecord;
+        // printv("STATE -> %s is full, spilled %lld to %s\n", this->name.c_str(), nRecord,
+        //        spillTo->name.c_str());
+        // printv("ACCESS -> A write to %s was made with size %llu bytes and latency %d ms\n",
+        //        spillTo->getName().c_str(), nRecord * Config::RECORD_SIZE,
+        //        spillTo->getAccessTimeInMillis(nRecord));
+        // flushv();
     }
     /** assumption: spilling the current file to disk will free up enough space */
     RowCount nRecord = writer->writeNextRun(run);
@@ -199,13 +236,18 @@ RunWriter *Storage::startSpillSession() {
 }
 
 void Storage::endSpillSession(RunWriter *currDeviceWriter, bool deleteCurrFile) {
-    printvv("INFO: Spill writer wrote %lld records\n", spillWriter->getCurrSize());
     if (spillWriter != nullptr) {
         if (currDeviceWriter != nullptr) {
+            printvv("DEBUG: Spilling leftovers of %s to %s\n", this->name.c_str(),
+                    spillTo->name.c_str());
+            spill(currDeviceWriter);
             if (deleteCurrFile && (!currDeviceWriter->isDeletedFile())) {
                 this->freeSpace(currDeviceWriter->getCurrSize());
+                printv("freeing up %lld bytes\n", currDeviceWriter->getCurrSize());
+                flushv();
                 currDeviceWriter->close();
                 currDeviceWriter->deleteFile();
+                this->runManager->removeRunFile(currDeviceWriter->getFilename());
             } else {
                 currDeviceWriter->close();
             }
@@ -216,6 +258,7 @@ void Storage::endSpillSession(RunWriter *currDeviceWriter, bool deleteCurrFile) 
         spillWriter->close();
         delete spillWriter;
         spillWriter = nullptr;
+        printvv("INFO: Spill writer wrote %lld records\n", nRecords);
     }
 }
 
