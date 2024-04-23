@@ -3,6 +3,7 @@
 
 
 #include "Record.h"
+#include "Storage.h"
 #include "config.h"
 #include "defs.h"
 #include <cstdio>
@@ -17,6 +18,7 @@
 #define DRAM_NAME "DRAM"
 #define DISK_NAME "HDD"
 #define SSD_NAME "SSD"
+
 
 // =========================================================
 // ------------------------ RunManager ---------------------
@@ -41,6 +43,16 @@ class RunManager {
         totalRecords += nRecords;
     }
 
+    void removeRunFile(std::string filename) {
+        auto it = std::find_if(
+            runFiles.begin(), runFiles.end(),
+            [filename](const std::pair<std::string, RowCount> &p) { return p.first == filename; });
+        if (it != runFiles.end()) {
+            totalRecords -= it->second;
+            runFiles.erase(it);
+        }
+    }
+
     // getters
     std::string getBaseDir() { return baseDir; }
     RowCount getTotalRecords() { return totalRecords; }
@@ -48,8 +60,8 @@ class RunManager {
     std::vector<std::pair<std::string, RowCount>> &getStoredRunsSortedBySize();
 
     std::string repr() {
-        std::string repr =
-            baseDir + "RunManager: " + "stored " + std::to_string(runFiles.size()) + " runs, ";
+        std::string repr = baseDir + "RunManager: " + "stored " + std::to_string(runFiles.size()) +
+                           " runs, total records: " + std::to_string(totalRecords);
         return repr;
     }
 }; // class RunManager
@@ -58,6 +70,7 @@ class RunManager {
 // =========================================================
 //  -------------------------- Storage ---------------------
 // =========================================================
+
 
 class Storage {
     std::string name;
@@ -192,12 +205,16 @@ class Storage {
     RunWriter *getRunWriter();
     RowCount writeNextChunk(RunWriter *writer, Run &run);
     void closeWriter(RunWriter *writer);
+    void addRunFile(std::string filename, RowCount nRecords) {
+        runManager->addRunFile(filename, nRecords);
+    }
     // ---- spill session ----
     RunWriter *startSpillSession();
-    void endSpillSession();
+    void endSpillSession(RunWriter *writer, bool deleteCurrFile = false);
 
     // ---------------------------- printing -----------------------------------
     std::string reprUsageDetails();
+    void printStoredRunFiles();
 
 }; // class Storage
 
@@ -223,7 +240,6 @@ class RunStreamer {
     Storage *toDevice;
     Page *currentPage;
     PageCount readAhead = 1;
-    bool deleteReader = false; // if true, delete reader after streaming
     // read ahead pages
     RowCount readAheadPages(int nPages);
 

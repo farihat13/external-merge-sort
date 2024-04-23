@@ -52,9 +52,7 @@ RunManager::~RunManager() {
 
 std::string RunManager::getNextRunFileName() {
     struct stat st = {0};
-    if (stat(baseDir.c_str(), &st) == -1) {
-        mkdir(baseDir.c_str(), 0777);
-    }
+    if (stat(baseDir.c_str(), &st) == -1) { mkdir(baseDir.c_str(), 0777); }
     std::string filename = baseDir + "/r" + std::to_string(nextRunIndex++) + ".txt";
     return filename;
 }
@@ -70,9 +68,7 @@ std::vector<std::string> RunManager::getRunInfoFromDir() {
             struct stat path_stat;
             std::string filePath = baseDir + "/" + entry->d_name;
             stat(filePath.c_str(), &path_stat);
-            if (S_ISREG(path_stat.st_mode)) {
-                runFiles.push_back(entry->d_name);
-            }
+            if (S_ISREG(path_stat.st_mode)) { runFiles.push_back(entry->d_name); }
         }
         closedir(dir);
     }
@@ -106,7 +102,7 @@ Storage::Storage(std::string name, ByteCount capacity, int bandwidth, double lat
     printv("\tBandwidth %d MB/s, Latency %3.1lf ms\n", BYTE_TO_MB(BANDWIDTH), SEC_TO_MS(LATENCY));
 
     this->configure();
-    this->runManager = new RunManager(this->name);
+    if (this->name != DRAM_NAME) { this->runManager = new RunManager(this->name); }
 }
 
 void Storage::configure() {
@@ -141,6 +137,7 @@ void Storage::configure() {
 // ------------------------------- Run Management ------------------------------
 
 RunWriter *Storage::getRunWriter() {
+    if (runManager == nullptr) { throw std::runtime_error("ERROR: RunManager is not initialized"); }
     std::string filename = runManager->getNextRunFileName();
     return new RunWriter(filename);
 }
@@ -153,9 +150,7 @@ RowCount Storage::writeNextChunk(RunWriter *writer, Run &run) {
             printvv("ERROR: %s is full, no spillTo device\n", this->name.c_str());
             throw std::runtime_error("Error: Storage is full, no spillTo device");
         }
-        if (spillWriter == nullptr) {
-            spillWriter = startSpillSession();
-        }
+        if (spillWriter == nullptr) { spillWriter = startSpillSession(); }
         // close the current file
         writer->close();
         // copy the file content to spillWriter
@@ -178,14 +173,22 @@ RowCount Storage::writeNextChunk(RunWriter *writer, Run &run) {
 }
 
 void Storage::closeWriter(RunWriter *writer) {
-    // this->addRunFile(writer->getFilename(), writer->getSize());
+    if (this->runManager == nullptr) {
+        printv("ERROR: RunManager is null in %s\n", this->name.c_str());
+        return;
+    }
+    if (writer == nullptr) {
+        printv("ERROR: Writer is null in %s\n", this->name.c_str());
+        return;
+    }
     RowCount nRecords = writer->getCurrSize();
     runManager->addRunFile(writer->getFilename(), nRecords);
-    // _filled += nRecords;
-    writer->close();
-    delete writer;
+
     if (spillWriter != nullptr) {
-        endSpillSession();
+        endSpillSession(writer, true);
+    } else {
+        writer->close();
+        delete writer;
     }
 }
 
@@ -195,9 +198,21 @@ RunWriter *Storage::startSpillSession() {
     return spillWriter;
 }
 
-void Storage::endSpillSession() {
+void Storage::endSpillSession(RunWriter *currDeviceWriter, bool deleteCurrFile) {
     printvv("INFO: Spill writer wrote %lld records\n", spillWriter->getCurrSize());
     if (spillWriter != nullptr) {
+        if (currDeviceWriter != nullptr) {
+            if (deleteCurrFile && (!currDeviceWriter->isDeletedFile())) {
+                this->freeSpace(currDeviceWriter->getCurrSize());
+                currDeviceWriter->close();
+                currDeviceWriter->deleteFile();
+            } else {
+                currDeviceWriter->close();
+            }
+        }
+
+        RowCount nRecords = spillWriter->getCurrSize();
+        spillTo->addRunFile(spillWriter->getFilename(), nRecords);
         spillWriter->close();
         delete spillWriter;
         spillWriter = nullptr;
@@ -211,8 +226,7 @@ void Storage::endSpillSession() {
 
 
 bool Storage::readFrom(const std::string &filePath) {
-    if (readFile.is_open())
-        readFile.close();
+    if (readFile.is_open()) readFile.close();
     readFilePath = filePath;
     readFile.open(readFilePath, std::ios::binary);
     if (!readFile.is_open()) {
@@ -230,8 +244,7 @@ bool Storage::readFrom(const std::string &filePath) {
 }
 
 bool Storage::writeTo(const std::string &filePath) {
-    if (writeFile.is_open())
-        writeFile.close();
+    if (writeFile.is_open()) writeFile.close();
     writeFilePath = filePath;
     writeFile.open(writeFilePath, std::ios::binary);
     if (!writeFile.is_open()) {
@@ -266,13 +279,11 @@ char *Storage::readRecords(RowCount *toRead) {
 }
 
 void Storage::closeRead() {
-    if (readFile.is_open())
-        readFile.close();
+    if (readFile.is_open()) readFile.close();
 }
 
 void Storage::closeWrite() {
-    if (writeFile.is_open())
-        writeFile.close();
+    if (writeFile.is_open()) writeFile.close();
 }
 
 
@@ -289,8 +300,23 @@ std::string Storage::reprUsageDetails() {
     state += "\n\t\ttotal capacity: " + std::to_string(getCapacityInRecords()) + " records";
     state +=
         "\n\t\ttotal empty space: " + std::to_string(getTotalEmptySpaceInRecords()) + " records";
-    state += "\n\t\t" + runManager->repr();
+    if (runManager != nullptr) { state += "\n\t\t" + runManager->repr(); }
     return state;
+}
+
+void Storage::printStoredRunFiles() {
+    if (runManager == nullptr) {
+        printv("ERROR: RunManager is not initialized in %s\n", this->name.c_str());
+        return;
+    }
+    std::vector<std::pair<std::string, RowCount>> runFiles =
+        runManager->getStoredRunsSortedBySize();
+    printv("INFO: %s has %d run files, totalRecords %lld\n", this->name.c_str(), runFiles.size(),
+           runManager->getTotalRecords());
+    for (auto &run : runFiles) {
+        printv("\t%s: %s\n", run.first.c_str(),
+               getSizeDetails(run.second * Config::RECORD_SIZE).c_str());
+    }
 }
 
 
@@ -308,9 +334,7 @@ RunStreamer::RunStreamer(Run *run) : currentRecord(run->getHead()), reader(nullp
 RunStreamer::RunStreamer(RunReader *reader, Storage *fromDevice, Storage *toDevice,
                          PageCount readAhead)
     : reader(reader), fromDevice(fromDevice), toDevice(toDevice), readAhead(readAhead) {
-    if (readAhead < 1) {
-        throw std::runtime_error("Error: ReadAhead should be at least 1");
-    }
+    if (readAhead < 1) { throw std::runtime_error("Error: ReadAhead should be at least 1"); }
     RowCount nRecords = readAheadPages(readAhead);
     if (nRecords == 0) {
         throw std::runtime_error("Error: RunStreamer initialized with empty run");
@@ -325,7 +349,11 @@ RowCount RunStreamer::readAheadPages(int nPages) {
     RowCount nRecords = 0;
     currentPage = reader->readNextPage();
     if (currentPage == nullptr) {
-        reader->close();
+        if (!reader->isDeletedFile()) {
+            fromDevice->freeSpace(reader->getFilesize());
+            reader->close();
+            reader->deleteFile();
+        }
         return 0;
     }
     nRecords += currentPage->getSizeInRecords();
@@ -333,7 +361,11 @@ RowCount RunStreamer::readAheadPages(int nPages) {
     for (int i = 0; i < nPages; i++) {
         Page *p = reader->readNextPage();
         if (p == nullptr) {
-            reader->close();
+            if (!reader->isDeletedFile()) {
+                fromDevice->freeSpace(reader->getFilesize());
+                reader->close();
+                reader->deleteFile();
+            }
             break;
         }
         nRecords += p->getSizeInRecords();
@@ -347,53 +379,11 @@ RowCount RunStreamer::readAheadPages(int nPages) {
            fromDevice->getAccessTimeInMillis(nRecords));
     return nRecords;
 }
-// RowCount RunStreamer::readAheadPages(int nPages) {
-//     RowCount nRecords = 0;
-//     currentPage = reader->readNextPage();
-//     bool closeReader = false;
-//     if (currentPage == nullptr) { // if no page is read, close the reader
-//         closeReader = true;
-//     } else {
-//         nRecords += currentPage->getSizeInRecords();
-//         Page *page = currentPage;
-//         for (int i = 0; i < nPages; i++) {
-//             Page *p = reader->readNextPage();
-//             if (p == nullptr) {
-//                 closeReader = true; // if no more pages to read, close the reader
-//                 break;
-//             }
-//             nRecords += p->getSizeInRecords();
-//             page->addNextPage(p);
-//             page = p;
-//         }
-//         toDevice->fillInputCluster(nRecords);
-//         printv("\tSTATE -> Read %lld records from %s\n", nRecords,
-//         reader->getFilename().c_str()); printv("\tACCESS -> A read from %s was made with size
-//         %llu bytes and latency %d ms\n",
-//                fromDevice->getName().c_str(), nRecords * Config::RECORD_SIZE,
-//                fromDevice->getAccessTimeInMillis(nRecords));
-//     }
-//     flushv();
-//     if (closeReader) {
-//         reader->close();
-//         fromDevice->freeSome(reader->getFilesize());
-//         printv("\t\t\tRunReader freed %lld bytes from %s, left %lld records\n",
-//                reader->getFilesize(), fromDevice->getName().c_str(),
-//                fromDevice->getTotalFilledSpaceInRecords());
-//         // if (deleteReader)
-//         //     reader->deleteFile();
-
-//         delete reader;
-//     }
-//     return nRecords;
-// }
 
 Record *RunStreamer::moveNext() {
     // if reader does not exist
     if (reader == nullptr) {
-        if (currentRecord->next == nullptr) {
-            return nullptr;
-        }
+        if (currentRecord->next == nullptr) { return nullptr; }
         currentRecord = currentRecord->next;
         return currentRecord;
     }
@@ -407,9 +397,7 @@ Record *RunStreamer::moveNext() {
         } else {
             // if no more page in memory, read next `readAhead` pages
             RowCount nRecords = readAheadPages(readAhead);
-            if (nRecords == 0) {
-                return nullptr;
-            }
+            if (nRecords == 0) { return nullptr; }
             currentRecord = currentPage->getFirstRecord();
         }
     } else {
