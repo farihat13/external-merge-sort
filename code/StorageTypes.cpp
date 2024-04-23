@@ -157,7 +157,7 @@ void SSD::mergeSSDRuns(HDD *outputDevice) {
      */
     printv("\t\tSTATE -> MERGE_SSD_RUNS: merging %d runs from SSD\n", runFiles.size());
     std::vector<RunStreamer *> runStreamers;
-    for (int i = 0; i < runFiles.size(); i++) {
+    for (size_t i = 0; i < runFiles.size(); i++) {
         std::string runFilename = runFiles[i].first;
         RowCount runSize = runFiles[i].second;
         printv("\t\t\t\tLoading run %d: %s, %lld records in mergeSSDRuns\n", i, runFilename.c_str(),
@@ -189,9 +189,7 @@ void SSD::mergeSSDRuns(HDD *outputDevice) {
     RowCount runningCount = 0;
     while (true) {
         Record *winner = loserTree.getNext();
-        if (winner == NULL) {
-            break;
-        }
+        if (winner == NULL) { break; }
         flushv();
         current->next = winner;
         current = current->next;
@@ -370,14 +368,12 @@ RowCount DRAM::loadInput(RowCount nRecordsToRead) {
      * 1. read records from HDD to DRAM
      **/
     char *recordsData = HDD::getInstance()->readRecords(&nRecordsToRead);
-    if (recordsData == NULL || nRecordsToRead == 0) {
-        printvv("WARNING: no records read\n");
-    }
+    if (recordsData == NULL || nRecordsToRead == 0) { printvv("WARNING: no records read\n"); }
     /**
      * 2. create a linked list of records
      **/
     Record *tail = nullptr;
-    for (int i = 0; i < nRecordsToRead; i++) {
+    for (RowCount i = 0; i < nRecordsToRead; i++) {
         Record *rec = new Record(recordsData);
         if (_head == NULL) {
             _head = rec;
@@ -430,15 +426,15 @@ void DRAM::genMiniRuns(RowCount nRecords) {
     assert(_miniruns.size() == 0 && "ERROR: miniruns is not empty");
     // std::vector<int> runSizes;
     Record *curr = _head;
-    for (int i = 0; i < nRecords; i += _cacheSize) {
+    for (RowCount i = 0; i < nRecords; i += _cacheSize) {
         std::vector<Record *> records;
-        for (int j = 0; j < _cacheSize && curr != nullptr; j++) {
+        for (RowCount j = 0; j < _cacheSize && curr != nullptr; j++) {
             records.push_back(curr);
             curr = curr->next;
         }
         quickSort(records);
         // update the next pointer
-        for (int j = 0; j < records.size() - 1; j++) {
+        for (size_t j = 0; j < records.size() - 1; j++) {
             records[j]->next = records[j + 1];
         }
         records.back()->next = nullptr;
@@ -454,9 +450,9 @@ void DRAM::mergeMiniRuns(HDD *outputStorage) {
     TRACE(true);
 #if defined(_VALIDATE)
     // validate each run is sorted and the size of the run
-    for (int i = 0; i < _miniruns.size(); i++) {
+    for (size_t i = 0; i < _miniruns.size(); i++) {
         Record *rec = _miniruns[i].getHead();
-        int count = 1;
+        size_t count = 1;
         // printv("\t\t\tRun %d: %d records\n", i, _miniruns[i].getSize());
         // printv("\t\t\t%s\n", rec->reprKey());
         while (rec->next != nullptr) {
@@ -489,7 +485,7 @@ void DRAM::mergeMiniRuns(HDD *outputStorage) {
      */
     RowCount totalInBufSizeDram = this->getTotalSpaceInInputClusters();
     RowCount keepNRecordsInDRAM = 0;
-    int i = 0;
+    size_t i = 0;
     for (; i < _miniruns.size(); i++) {
         int size = _miniruns[i].getSize();
         if (keepNRecordsInDRAM + size < totalInBufSizeDram) {
@@ -506,7 +502,7 @@ void DRAM::mergeMiniRuns(HDD *outputStorage) {
         printv("\t\t\tDEBUG: spill %d runs out of %d to SSDs starting from %dth run in mergeMini\n",
                _miniruns.size() - i, _miniruns.size(), i);
         int spillNRecords = 0;
-        int j;
+        size_t j;
         for (j = i; j < _miniruns.size(); j++) {
             spillNRecords += _miniruns[j].getSize();
             outputStorage->storeRun(_miniruns[j]);
@@ -537,9 +533,7 @@ void DRAM::mergeMiniRuns(HDD *outputStorage) {
     RowCount runningCount = 0;
     while (true) {
         Record *winner = loserTree.getNext();
-        if (winner == NULL) {
-            break;
-        }
+        if (winner == NULL) { break; }
         // printv("\t\tWinner: %s\n", winner->reprKey());
         flushv();
         // winner->next = nullptr;
@@ -568,6 +562,7 @@ void DRAM::mergeMiniRuns(HDD *outputStorage) {
     }
     if (runningCount > 0) {
         /* write the remaining records */
+        printv("\t\t\tWriting the remaining %lld records to SSD\n", runningCount);
         Run merged(head->next, runningCount);
         RowCount nRecord = outputStorage->writeNextChunk(writer, merged);
         assert(nRecord == runningCount && "ERROR: Writing remains of run to file");
@@ -578,9 +573,6 @@ void DRAM::mergeMiniRuns(HDD *outputStorage) {
     outputStorage->closeWriter(writer);
     assert(outputStorage->getTotalFilledSpaceInRecords() >= nSorted &&
            "ERROR: outputStorage filled space mismatch");
-
-    // cleanup memory
-    delete head;
 
 #if defined(_VALIDATE)
     if (nSorted != keepNRecordsInDRAM) {
@@ -605,6 +597,9 @@ void DRAM::mergeMiniRuns(HDD *outputStorage) {
      */
     this->reset();
     this->resetMergeState();
+
+    // cleanup memory
+    delete head;
 
     // final print
     printv("\t\t\tINFO: MERGE_MINIRUNS Complete: Merged %lld records in DRAM\n", nSorted);

@@ -100,9 +100,7 @@ int Page::read(std::ifstream &is) {
 int Page::write(std::ofstream &os) {
     for (auto rec : records) {
         os.write(rec->data, Config::RECORD_SIZE);
-        if (!os) {
-            throw std::runtime_error("Error: Writing to file");
-        }
+        if (!os) { throw std::runtime_error("Error: Writing to file"); }
     }
     return this->getSizeInRecords();
 }
@@ -110,9 +108,7 @@ int Page::write(std::ofstream &os) {
 bool Page::isSorted() const {
     Record *rec = records[0];
     while (rec->next != nullptr) {
-        if (rec->next->data < rec->data) {
-            return false;
-        }
+        if (rec->next->data < rec->data) { return false; }
         rec = rec->next;
     }
     return true;
@@ -121,9 +117,7 @@ bool Page::isSorted() const {
 
 bool Page::isValid() const {
     // 1. check if capacity exceeds size of records
-    if (capacity < records.size()) {
-        return false;
-    }
+    if (capacity < records.size()) { return false; }
     // 3. check if all records are valid;
     // // NOTE: uncomment for extra check
     // for (auto rec : records) {
@@ -150,17 +144,11 @@ Page *RunReader::readNextPage() {
     Page *page = new Page(PAGE_SIZE_IN_RECORDS);
     // 1. read a page
     RowCount nRecords = page->read(_is);
-    if (nRecords == 0) {
-        return nullptr;
-    }
+    if (nRecords == 0) { return nullptr; }
     // 2. if page is not valid, throw error
-    if (!page->isValid()) {
-        throw std::runtime_error("Error: Page is not valid");
-    }
+    if (!page->isValid()) { throw std::runtime_error("Error: Page is not valid"); }
     // 3. check if all records are sorted
-    if (!page->isSorted()) {
-        throw std::runtime_error("Error: Page is not sorted");
-    }
+    if (!page->isSorted()) { throw std::runtime_error("Error: Page is not sorted"); }
     _nRecordsRead += nRecords;
     return page;
 }
@@ -173,15 +161,11 @@ Page *RunReader::readNextPage() {
 
 RowCount RunWriter::writeNextPage(Page *page) {
     // 1. check validity of a page
-    if (!page->isValid()) {
-        throw std::runtime_error("Error: Page is not valid");
-    }
+    if (!page->isValid()) { throw std::runtime_error("Error: Page is not valid"); }
     // 2. check if all records are sorted
-    if (!page->isSorted()) {
-        throw std::runtime_error("Error: Page is not sorted");
-    }
+    if (!page->isSorted()) { throw std::runtime_error("Error: Page is not sorted"); }
     // 3. write a page
-    int nRecords = page->write(_os);
+    RowCount nRecords = page->write(_os);
     if (nRecords != page->getSizeInRecords()) {
         throw std::runtime_error("Error: Writing " + std::to_string(nRecords) +
                                  " records, expected " + std::to_string(page->getSizeInRecords()));
@@ -192,9 +176,7 @@ RowCount RunWriter::writeNextPage(Page *page) {
 
 RowCount RunWriter::writeFromFile(std::string writeFromFilename, RowCount toCopyNRecords) {
     std::ifstream is(writeFromFilename, std::ios::binary);
-    if (!is) {
-        throw std::runtime_error("Error: Opening file " + writeFromFilename);
-    }
+    if (!is) { throw std::runtime_error("Error: Opening file " + writeFromFilename); }
     ByteCount bufSize = ROUNDUP(1024 * 1024, Config::RECORD_SIZE);
     char *buffer = new char[bufSize];
     ByteCount total = 0;
@@ -205,9 +187,7 @@ RowCount RunWriter::writeFromFile(std::string writeFromFilename, RowCount toCopy
         total += n;
     }
     delete[] buffer;
-    if (!_os) {
-        throw std::runtime_error("Error: Writing to file");
-    }
+    if (!_os) { throw std::runtime_error("Error: Writing to file"); }
     RowCount nRecords = total / Config::RECORD_SIZE;
     currSize += nRecords;
     printv("\t\t\t\tRunWriter copied %llu out of %llu records from %s to %s\n", nRecords,
@@ -220,9 +200,7 @@ RowCount RunWriter::writeNextRun(Run &run) {
     char *data = run.getAllData();
     RowCount nRecords = run.getSize();
     _os.write(data, nRecords * Config::RECORD_SIZE);
-    if (!_os) {
-        throw std::runtime_error("Error: Writing to file");
-    }
+    if (!_os) { throw std::runtime_error("Error: Writing to file"); }
     currSize += nRecords;
     delete[] data;
     return nRecords;
