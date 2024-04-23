@@ -51,7 +51,7 @@ ScanIterator::ScanIterator(ScanPlan const *const plan) : _plan(plan), _count(0) 
         srand(time(0));
 #if defined(_DEBUG)
         // seed is fixed for reproducibility
-        srand(100);
+        // srand(100);
 #endif
         traceprintf("generating input file '%s'\n", plan->_filename.c_str());
         std::ofstream input_file(_plan->_filename, std::ios::binary);

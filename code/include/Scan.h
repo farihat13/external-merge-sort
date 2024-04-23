@@ -31,9 +31,9 @@ class ScanIterator : public Iterator {
     ScanPlan const *const _plan;
     RowCount _count;
 
-    HDD *_hdd;
+    // HDD *_hdd;
     std::ifstream _file;
-    Page *_currpage;
+    // Page *_currpage;
 }; // class ScanIterator
 
 #endif // _SCAN_H_

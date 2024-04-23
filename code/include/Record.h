@@ -115,12 +115,16 @@ class Page {
      * This constructor will NOT allocate memory for records
      */
     Page(RowCount capacityInRecords) : capacity(capacityInRecords) {
-        if (capacity < 0) { throw std::runtime_error("Error: Page capacity cannot be negative"); }
+        if (capacity < 0) {
+            throw std::runtime_error("Error: Page capacity cannot be negative");
+        }
         this->records.reserve(capacity);
         this->next = nullptr;
     }
     ~Page() {
-        for (auto rec : records) { delete rec; }
+        for (auto rec : records) {
+            delete rec;
+        }
         delete &records;
     }
 
@@ -181,28 +185,36 @@ class RunReader {
     RunReader(const std::string &filename, RowCount filesize, RowCount pageSizeInRecords)
         : filename(filename), filesize(filesize), PAGE_SIZE_IN_RECORDS(pageSizeInRecords),
           _is(filename, std::ios::binary) {
-        if (!_is) { throw std::runtime_error("Cannot open file: " + filename); }
-        printv("\t\t\tRunReader opened '%s'\n", filename.c_str());
+        if (!_is) {
+            throw std::runtime_error("Cannot open file: " + filename);
+        }
+        printv("\t\t\t\tRunReader opened '%s'\n", filename.c_str());
     }
     ~RunReader() {
-        if (_is.is_open()) { _is.close(); }
-        printv("\t\t\tRunReader destroyed '%s'\n", filename.c_str());
+        if (_is.is_open()) {
+            _is.close();
+        }
+        printv("\t\t\t\tRunReader destroyed '%s'\n", filename.c_str());
     }
     void close() {
         if (!_isDeleted) {
-            if (_is.is_open()) { _is.close(); }
+            if (_is.is_open()) {
+                _is.close();
+            }
         }
-        printv("\t\t\tRunReader closed '%s'\n", filename.c_str());
+        printv("\t\t\t\tRunReader closed '%s'\n", filename.c_str());
     }
     void deleteFile() {
         if (!_isDeleted) {
-            if (_is.is_open()) { _is.close(); }
+            if (_is.is_open()) {
+                _is.close();
+            }
             if (std::remove(filename.c_str()) != 0) {
                 throw std::runtime_error("Error deleting file: " + filename);
             }
             _isDeleted = true;
         }
-        printv("\t\t\tDEBUG: RunReader deleted '%s'\n", filename.c_str());
+        printv("\t\t\t\tDEBUG: RunReader DELETED '%s'\n", filename.c_str());
     }
     bool isDeletedFile() { return _isDeleted; }
     Page *readNextPage();
@@ -232,41 +244,53 @@ class RunWriter {
   public:
     RunWriter(const std::string &filename)
         : _filename(filename), _os(filename, std::ios::binary | std::ios::trunc) {
-        if (!_os) { throw std::runtime_error("Cannot open file: " + filename); }
-        printv("\t\t\tRunWriter opened '%s'\n", filename.c_str());
+        if (!_os) {
+            throw std::runtime_error("Cannot open file: " + filename);
+        }
+        printv("\t\t\t\tRunWriter opened '%s'\n", filename.c_str());
     }
 
     ~RunWriter() {
-        if (_os.is_open()) { _os.close(); }
-        printv("\t\t\tRunWriter destroyed '%s'\n", _filename.c_str());
+        if (_os.is_open()) {
+            _os.close();
+        }
+        printv("\t\t\t\tRunWriter destroyed '%s'\n", _filename.c_str());
     }
 
     RowCount writeNextPage(Page *page);
     RowCount writeNextRun(Run &run);
     RowCount writeFromFile(std::string filename, RowCount toCopyNRecords);
     void reset() {
-        if (_os.is_open()) { _os.close(); }
+        if (_os.is_open()) {
+            _os.close();
+        }
         // truncate the file to 0 bytes
         _os.open(_filename, std::ios::binary | std::ios::trunc);
-        if (!_os) { throw std::runtime_error("Cannot open file: " + _filename); }
+        if (!_os) {
+            throw std::runtime_error("Cannot open file: " + _filename);
+        }
         currSize = 0;
-        printv("\t\t\tRunWriter reset '%s'\n", _filename.c_str());
+        printv("\t\t\t\tRunWriter RESET '%s'\n", _filename.c_str());
     }
     void close() {
         if (!_isDeleted) {
-            if (_os.is_open()) { _os.close(); }
+            if (_os.is_open()) {
+                _os.close();
+            }
         }
-        printv("\t\t\tRunWriter closed '%s'\n", _filename.c_str());
+        printv("\t\t\t\tRunWriter closed '%s'\n", _filename.c_str());
     }
     void deleteFile() {
         if (!_isDeleted) {
-            if (_os.is_open()) { _os.close(); }
+            if (_os.is_open()) {
+                _os.close();
+            }
             if (std::remove(_filename.c_str()) != 0) {
                 throw std::runtime_error("Error deleting file: " + _filename);
             }
             _isDeleted = true;
         }
-        printv("\t\t\tDEBUG: RunReader deleted '%s'\n", _filename.c_str());
+        printv("\t\t\t\tRunReader DELETED '%s'\n", _filename.c_str());
     }
     bool isDeletedFile() { return _isDeleted; }
     // ---- getters ----

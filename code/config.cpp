@@ -1,4 +1,5 @@
 #include "config.h"
+#include <iomanip>
 #include <sys/stat.h>
 
 // =========================================================
@@ -9,14 +10,14 @@
 // ---- Cache ----
 int Config::CACHE_SIZE = 1 * 1024 * 1024; // 1 MB
 // ---- DRAM ----
-ByteCount Config::DRAM_CAPACITY = 1LL * 100 * 1024 * 1024; // 100 MB
-double Config::DRAM_LATENCY = 1.0 / (1000 * 1000);         // 10 microsecond
-int Config::DRAM_BANDWIDTH = 100 * 1024 * 1024;            // 100 GB/s
+ByteCount Config::DRAM_CAPACITY = 1LL * 20 * 1024 * 1024; // 20 MB TODO: change to 100 MB
+double Config::DRAM_LATENCY = 1.0 / (1000 * 1000);        // 10 microsecond
+int Config::DRAM_BANDWIDTH = 100 * 1024 * 1024;           // 100 GB/s
 // DRAM buffer size = 1 MB
 // ---- SSD ----
-ByteCount Config::SSD_CAPACITY = 1LL * 1024 * 1024 * 1024; // 512 MB TODO: change to 10GB
-double Config::SSD_LATENCY = 1.0 / (10 * 1000);            // 0.1 ms
-int Config::SSD_BANDWIDTH = 100 * 1024 * 1024;             // 100 MB/s
+ByteCount Config::SSD_CAPACITY = 1LL * 75 * 1024 * 1024; // 75 MB TODO: change to 10GB
+double Config::SSD_LATENCY = 1.0 / (10 * 1000);          // 0.1 ms
+int Config::SSD_BANDWIDTH = 100 * 1024 * 1024;           // 100 MB/s
 // SSD buffer size = 10 MB
 // ---- HDD ----
 ByteCount Config::HDD_CAPACITY = INFINITE_CAPACITY * 1LL; // Infinite
@@ -140,7 +141,9 @@ std::string formatNum(uint64_t number) {
     size_t dotPos = result.find('.');
     if (dotPos != std::string::npos) {
         // Remove trailing zeros
-        while (result.back() == '0') { result.pop_back(); }
+        while (result.back() == '0') {
+            result.pop_back();
+        }
         // If the last character is the dot, remove it
         if (result.back() == '.') { result.pop_back(); }
     }

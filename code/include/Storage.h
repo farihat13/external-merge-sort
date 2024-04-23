@@ -101,9 +101,9 @@ class Storage {
     RowCount _filledOutputClusters = 0;
     RowCount _totalSpaceInInputClusters = 0;  // setup before merging
     RowCount _totalSpaceInOutputClusters = 0; // setup before merging
+    // ----- spill session ----
     // assumption: spill amount will always be less than capacity
     Storage *spillTo = nullptr; // used for merging
-    //----- spill session ----
     RunWriter *spillWriter = nullptr;
 
     // setup
@@ -174,6 +174,8 @@ class Storage {
         _filledInputClusters = 0;
         _filledOutputClusters = 0;
     }
+
+    // --------------------------- merging states ------------------------------
     // merging states
     void resetMergeState() {
         _effectiveClusterSize = 0;
@@ -194,9 +196,7 @@ class Storage {
     bool readFrom(const std::string &filePath);
     bool writeTo(const std::string &filePath);
     std::streampos getReadPosition() { return readFile.tellg(); }
-    // std::streampos getWritePosition() { return writeFile.tellp(); }
     char *readRecords(RowCount *nRecords);
-    // RowCount writeRecords(char *data, RowCount nRecords);
     // cleanup
     void closeRead();
     void closeWrite();
@@ -212,6 +212,12 @@ class Storage {
     void spill(RunWriter *writer);
     RunWriter *startSpillSession();
     void endSpillSession(RunWriter *writer, bool deleteCurrFile = false);
+    int getRunfilesCount() {
+        if (runManager == nullptr) {
+            return 0;
+        }
+        return runManager->getStoredRunsSortedBySize().size();
+    }
 
     // ---------------------------- printing -----------------------------------
     std::string reprUsageDetails();
