@@ -81,6 +81,11 @@ class Run {
         char *buffer = new char[size * Config::RECORD_SIZE];
         Record *curr = runHead;
         for (RowCount i = 0; i < size; i++) {
+            if (curr == nullptr) {
+                printv("ERROR: Run size %lld is less than expected %lld\n", i, size);
+                flushv();
+                throw std::runtime_error("Error: Run size is less than expected");
+            }
             std::memcpy(buffer + i * Config::RECORD_SIZE, curr->data, Config::RECORD_SIZE);
             curr = curr->next;
         }

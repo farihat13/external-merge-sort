@@ -12,32 +12,30 @@ class HDD : public Storage {
   private:
     static HDD *instance;
 
+    // ---- only needed for mergeHDDRuns ----
+    int setupMergeStateInSSDAndDRAM();
+    std::vector<RunStreamer *> loadRunfilesToDRAM(size_t fanIn);
+
   protected:
     HDD(std::string name = DISK_NAME, ByteCount capacity = Config::HDD_CAPACITY,
         int bandwidth = Config::HDD_BANDWIDTH, double latency = Config::HDD_LATENCY);
 
   public:
     static HDD *getInstance() {
-        if (instance == nullptr) {
-            instance = new HDD();
-        }
+        if (instance == nullptr) { instance = new HDD(); }
         return instance;
     }
 
     ~HDD() {
-        if (runManager != nullptr) {
-            delete runManager;
-        }
+        if (runManager != nullptr) { delete runManager; }
     }
 
-    void setupMergeState(RowCount outputDevicePageSize, int fanIn);
-    int setupMergeStateForMiniruns(RowCount outputDevicePageSize);
-    void mergeRuns();
+    // void setupMergeState(RowCount outputDevicePageSize, int fanIn);
+    // int setupMergeStateForMiniruns(RowCount outputDevicePageSize);
+    void mergeHDDRuns();
     RowCount storeRun(Run &run);
     // ---- helper functions ----
     void printStates(std::string where);
-    void getConstants(RowCount &ssdPageSize, RowCount &hddPageSize, RowCount &ssdCapacity,
-                      RowCount &ssdEmptySpace, RowCount &dramCapacity);
 };
 
 // ==================================================================
@@ -52,12 +50,11 @@ class SSD : public HDD {
 
   public:
     static SSD *getInstance() {
-        if (instance == nullptr) {
-            instance = new SSD();
-        }
+        if (instance == nullptr) { instance = new SSD(); }
         return instance;
     }
     ~SSD() {}
+    void setupMergeState(RowCount outputDevicePageSize, int fanIn);
     void mergeSSDRuns(HDD *outputDevice);
 };
 
@@ -79,9 +76,7 @@ class DRAM : public Storage {
 
   public:
     static DRAM *getInstance() {
-        if (instance == nullptr) {
-            instance = new DRAM();
-        }
+        if (instance == nullptr) { instance = new DRAM(); }
         return instance;
     }
 

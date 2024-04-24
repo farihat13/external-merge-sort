@@ -53,9 +53,7 @@ RunManager::~RunManager() {
 
 std::string RunManager::getNextRunFileName() {
     struct stat st = {0};
-    if (stat(baseDir.c_str(), &st) == -1) {
-        mkdir(baseDir.c_str(), 0777);
-    }
+    if (stat(baseDir.c_str(), &st) == -1) { mkdir(baseDir.c_str(), 0777); }
     std::string filename = baseDir + "/r" + std::to_string(nextRunIndex++) + ".txt";
     return filename;
 }
@@ -71,9 +69,7 @@ std::vector<std::string> RunManager::getRunInfoFromDir() {
             struct stat path_stat;
             std::string filePath = baseDir + "/" + entry->d_name;
             stat(filePath.c_str(), &path_stat);
-            if (S_ISREG(path_stat.st_mode)) {
-                runFiles.push_back(entry->d_name);
-            }
+            if (S_ISREG(path_stat.st_mode)) { runFiles.push_back(entry->d_name); }
         }
         closedir(dir);
     }
@@ -107,9 +103,7 @@ Storage::Storage(std::string name, ByteCount capacity, int bandwidth, double lat
     printv("\tBandwidth %d MB/s, Latency %3.1lf ms\n", BYTE_TO_MB(BANDWIDTH), SEC_TO_MS(LATENCY));
 
     this->configure();
-    if (this->name != DRAM_NAME) {
-        this->runManager = new RunManager(this->name);
-    }
+    if (this->name != DRAM_NAME) { this->runManager = new RunManager(this->name); }
 }
 
 void Storage::configure() {
@@ -123,11 +117,11 @@ void Storage::configure() {
     // calculate the cluster size in pages
     int nRecords = this->CAPACITY_IN_BYTES / Config::RECORD_SIZE;
     int nPages = nRecords / this->PAGE_SIZE_IN_RECORDS;
-    this->CLUSTER_SIZE = nPages / (this->MERGE_FAN_IN + this->MERGE_FAN_OUT);
+    this->CLUSTER_SIZE = nPages / (this->MAX_MERGE_FAN_IN + this->MAX_MERGE_FAN_OUT);
 
     // calculate the merge fan-in and merge fan-out
     this->MERGE_FANIN_IN_RECORDS =
-        this->MERGE_FAN_IN * this->CLUSTER_SIZE * this->PAGE_SIZE_IN_RECORDS;
+        this->MAX_MERGE_FAN_IN * this->CLUSTER_SIZE * this->PAGE_SIZE_IN_RECORDS;
     this->MERGE_FANOUT_IN_RECORDS = getCapacityInRecords() - this->MERGE_FANIN_IN_RECORDS;
 
     // print the configurations
@@ -144,9 +138,7 @@ void Storage::configure() {
 // ------------------------------- Run Management ------------------------------
 
 RunWriter *Storage::getRunWriter() {
-    if (runManager == nullptr) {
-        throw std::runtime_error("ERROR: RunManager is not initialized");
-    }
+    if (runManager == nullptr) { throw std::runtime_error("ERROR: RunManager is not initialized"); }
     std::string filename = runManager->getNextRunFileName();
     return new RunWriter(filename);
 }
@@ -157,9 +149,7 @@ void Storage::spill(RunWriter *writer) {
         printvv("ERROR: %s is full, no spillTo device\n", this->name.c_str());
         throw std::runtime_error("Error: Storage is full, no spillTo device");
     }
-    if (spillWriter == nullptr) {
-        spillWriter = startSpillSession();
-    }
+    if (spillWriter == nullptr) { spillWriter = startSpillSession(); }
     // close the current file
     writer->close();
     // copy the file content to spillWriter
@@ -185,9 +175,7 @@ void Storage::spill(RunWriter *writer) {
 
 RowCount Storage::writeNextChunk(RunWriter *writer, Run &run) {
     RowCount _empty = this->getTotalEmptySpaceInRecords();
-    if (run.getSize() > _empty) {
-        spill(writer);
-    }
+    if (run.getSize() > _empty) { spill(writer); }
     /** assumption: spilling the current file to disk will free up enough space */
     RowCount nRecord = writer->writeNextRun(run);
     _filled += nRecord;
@@ -318,21 +306,22 @@ void Storage::closeWrite() {
 
 // ---------------------------- printing -----------------------------------
 std::string Storage::reprUsageDetails() {
-    std::string state = "\t\t\t" + this->name + " usage details: ";
+    std::string state = "\n\t\t\t" + this->name + " usage details: ";
+    state += "\n\t\t\t\tcapacity: " + (CAPACITY_IN_BYTES == INFINITE_CAPACITY
+                                           ? "Infinite"
+                                           : std::to_string(getCapacityInRecords()) + " records");
     state += "\n\t\t\t\t_filled (with runfiles): " + std::to_string(_filled) + " records";
     state += "\n\t\t\t\tinputcluster: " + std::to_string(_filledInputClusters) + " out of " +
              std::to_string(_totalSpaceInInputClusters) + " records";
-    state += ", outputcluster: " + std::to_string(_filledOutputClusters) + " out of " +
+    state += ", \n\t\t\t\toutputcluster: " + std::to_string(_filledOutputClusters) + " out of " +
              std::to_string(_totalSpaceInOutputClusters) + " records";
     state +=
-        ", cluster size (bufsize per run): " + std::to_string(_effectiveClusterSize) + " records";
-    state +=
-        "\n\t\t\t\ttotal filled: " + std::to_string(getTotalFilledSpaceInRecords()) + " records";
-    state += " out of capacity: " + std::to_string(getCapacityInRecords()) + " records";
+        ", \n\t\t\t\tcluster size (inbuf size per run): " + std::to_string(_effectiveClusterSize) +
+        " records";
+    state += "\n\t\t\t\ttotal filled: " + std::to_string(getTotalFilledSpaceInRecords()) +
+             " out of " + std::to_string(getCapacityInRecords()) + " records";
     state += ", total empty space: " + std::to_string(getTotalEmptySpaceInRecords()) + " records";
-    if (runManager != nullptr) {
-        state += "\n\t\t\t" + runManager->repr();
-    }
+    if (runManager != nullptr) { state += "\n\t\t\t" + runManager->repr(); }
     return state;
 }
 
@@ -366,9 +355,7 @@ RunStreamer::RunStreamer(Run *run) : currentRecord(run->getHead()), reader(nullp
 RunStreamer::RunStreamer(RunReader *reader, Storage *fromDevice, Storage *toDevice,
                          PageCount readAhead)
     : reader(reader), fromDevice(fromDevice), toDevice(toDevice), readAhead(readAhead) {
-    if (readAhead < 1) {
-        throw std::runtime_error("Error: ReadAhead should be at least 1");
-    }
+    if (readAhead < 1) { throw std::runtime_error("Error: ReadAhead should be at least 1"); }
     RowCount nRecords = readAheadPages(readAhead);
     if (nRecords == 0) {
         throw std::runtime_error("Error: RunStreamer initialized with empty run");
@@ -379,9 +366,23 @@ RunStreamer::RunStreamer(RunReader *reader, Storage *fromDevice, Storage *toDevi
     }
 }
 
+RunStreamer::RunStreamer(RunStreamer *streamer, Storage *fromDevice, Storage *toDevice,
+                         PageCount readAhead)
+    : streamer(streamer), fromDevice(fromDevice), toDevice(toDevice), readAhead(readAhead) {
+    if (readAhead < 1) { throw std::runtime_error("Error: ReadAhead should be at least 1"); }
+    this->currentRecord = streamer->currentRecord;
+    if (currentRecord == nullptr) {
+        throw std::runtime_error("Error: RunStreamer initialized with empty run");
+    }
+    printv("\t\t\tRunStreamer initialized with streamer %s, curr_rec: %s\n",
+           streamer->getName().c_str(), currentRecord->reprKey());
+}
+
 RowCount RunStreamer::readAheadPages(int nPages) {
     RowCount nRecords = 0;
+    int nPRead = 0;
     currentPage = reader->readNextPage();
+    nPRead++;
     if (currentPage == nullptr) {
         if (!reader->isDeletedFile()) {
             fromDevice->freeSpace(reader->getFilesize());
@@ -392,8 +393,9 @@ RowCount RunStreamer::readAheadPages(int nPages) {
     }
     nRecords += currentPage->getSizeInRecords();
     Page *page = currentPage;
-    for (int i = 0; i < nPages; i++) {
+    for (int i = 1; i < nPages; i++) {
         Page *p = reader->readNextPage();
+        nPRead++;
         if (p == nullptr) {
             if (!reader->isDeletedFile()) {
                 fromDevice->freeSpace(reader->getFilesize());
@@ -406,6 +408,7 @@ RowCount RunStreamer::readAheadPages(int nPages) {
         page->addNextPage(p);
         page = p;
     }
+    // printv("FOCUS: %d from %s\n", nPRead, reader->getFilename().c_str());
     toDevice->fillInputCluster(nRecords);
     printv("\t\t\t\tSTATE -> Read %lld records from %s using RS\n", nRecords,
            reader->getFilename().c_str());
@@ -415,16 +418,14 @@ RowCount RunStreamer::readAheadPages(int nPages) {
     return nRecords;
 }
 
-Record *RunStreamer::moveNext() {
-    // if reader does not exist
-    if (reader == nullptr) {
-        if (currentRecord->next == nullptr) {
-            return nullptr;
-        }
-        currentRecord = currentRecord->next;
-        return currentRecord;
-    }
+Record *RunStreamer::moveNextForRun() {
+    // if reader and streamer does not exist
+    if (currentRecord->next == nullptr) { return nullptr; }
+    currentRecord = currentRecord->next;
+    return currentRecord;
+}
 
+Record *RunStreamer::moveNextForReader() {
     // if reader exists
     if (currentRecord == currentPage->getLastRecord()) {
         // if this is the last record in the page, move to the next page
@@ -434,9 +435,7 @@ Record *RunStreamer::moveNext() {
         } else {
             // if no more page in memory, read next `readAhead` pages
             RowCount nRecords = readAheadPages(readAhead);
-            if (nRecords == 0) {
-                return nullptr;
-            }
+            if (nRecords == 0) { return nullptr; }
             currentRecord = currentPage->getFirstRecord();
         }
     } else {
@@ -445,4 +444,25 @@ Record *RunStreamer::moveNext() {
         currentRecord = currentRecord->next;
     }
     return currentRecord;
+}
+
+Record *RunStreamer::moveNextForStreamer() {
+    // if streamer exists
+    return streamer->moveNext();
+    printv("DEBUG: moving next for streamer %s\n", getName().c_str());
+}
+
+Record *RunStreamer::moveNext() {
+    // if reader does not exist
+    if (reader == nullptr && streamer == nullptr) { return moveNextForRun(); }
+    if (streamer == nullptr) {
+        // if reader exists
+        if (reader != nullptr)
+            return moveNextForReader();
+        else
+            return nullptr;
+    } else {
+        // if streamer exists
+        return moveNextForStreamer();
+    }
 }

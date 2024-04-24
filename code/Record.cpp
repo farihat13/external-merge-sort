@@ -177,7 +177,7 @@ RowCount RunWriter::writeNextPage(Page *page) {
 RowCount RunWriter::writeFromFile(std::string writeFromFilename, RowCount toCopyNRecords) {
     std::ifstream is(writeFromFilename, std::ios::binary);
     if (!is) { throw std::runtime_error("Error: Opening file " + writeFromFilename); }
-    ByteCount bufSize = ROUNDUP(1024 * 1024, Config::RECORD_SIZE);
+    ByteCount bufSize = RoundUp(1024 * 1024, Config::RECORD_SIZE);
     char *buffer = new char[bufSize];
     ByteCount total = 0;
     while (is) {
