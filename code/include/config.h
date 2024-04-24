@@ -18,8 +18,8 @@
 #include <vector>
 
 
-#define ROUNDUP(x, byY) (((x) + (byY - 1)) & ~(byY - 1))
-#define ROUNDDOWN(x, byY) ((x) & ~(byY - 1))
+// #define ROUNDUP(x, byY) (((x) + (byY - 1)) & ~(byY - 1))
+// #define ROUNDDOWN(x, byY) ((x) & ~(byY - 1))
 #define ROUNDUP_4K(x) (((x) + 4095) & ~4095)
 #define BYTE_TO_KB(x) ((x) / 1024)
 #define BYTE_TO_MB(x) ((x) / (1024 * 1024))
@@ -82,8 +82,7 @@ class Logger {
   private:
     std::ofstream traceFile;
     Logger() {
-        if (!traceFile.is_open())
-            traceFile.open(Config::TRACE_FILE);
+        if (!traceFile.is_open()) traceFile.open(Config::TRACE_FILE);
     }
 
   public:
@@ -111,12 +110,18 @@ extern std::ofstream logFile;
 
 void printVerbose(bool vv, char const *const file, int const line, char const *const function,
                   const char *format, ...);
+void flushVerbose();
+#if defined(_DEBUG) || defined(DEBUG)
+// Only define the printv and printvv macros if in a debug build
 #define printv(...) printVerbose(false, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
 #define printvv(...) printVerbose(true, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
-
-
-void flushVerbose();
 #define flushv() flushVerbose()
+#else
+// Define empty macros when not in debug mode
+#define printv(...) ((void)0)
+#define printvv(...) ((void)0)
+#define flushv() ((void)0)
+#endif
 
 
 // =========================================================

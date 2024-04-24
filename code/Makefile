@@ -2,6 +2,7 @@
 CPPOPT=-g -Og -D_DEBUG -D_VALIDATE #-D_USE_LOGFILE
 # -O2 -Os -Ofast
 # -fprofile-generate -fprofile-use
+# -fsanitize=address -fsanitize=leak -fsanitize=undefined
 
 # compiler flags
 CPPFLAGS=$(CPPOPT) -Wall -ansi -pedantic -std=c++11 -Iinclude

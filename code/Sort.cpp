@@ -151,7 +151,7 @@ void SortIterator::firstPass() {
                 // TODO: copy the last run to HDD and rename
                 break;
             } else {
-                _hdd->mergeRuns();
+                _hdd->mergeHDDRuns();
             }
         }
         ++mergeIteration;

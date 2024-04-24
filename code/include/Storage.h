@@ -81,8 +81,8 @@ class Storage {
     // ---- calibrable configurations ----
     RowCount PAGE_SIZE_IN_RECORDS = 0; // in records
     PageCount CLUSTER_SIZE = 0;        // in pages
-    int MERGE_FAN_IN = 45;             // #runs to merge at a time, or #input_clusters
-    int MERGE_FAN_OUT = 5;             // #output_clusters
+    int MAX_MERGE_FAN_IN = 45;         // #runs to merge at a time, or #input_clusters
+    int MAX_MERGE_FAN_OUT = 5;         // #output_clusters
     RowCount MERGE_FANIN_IN_RECORDS;   // total #records to merge at a time per input cluster
     RowCount MERGE_FANOUT_IN_RECORDS;  // total #records that can be stored in output clusters
     // ---- read/write buffer ----
@@ -121,8 +121,8 @@ class Storage {
     RowCount getPageSizeInRecords() const { return PAGE_SIZE_IN_RECORDS; }
     RowCount getMergeFanInRecords() const { return MERGE_FANIN_IN_RECORDS; }
     RowCount getMergeFanOutRecords() const { return MERGE_FANOUT_IN_RECORDS; }
-    int getMergeFanIn() const { return MERGE_FAN_IN; }
-    int getMergeFanOut() const { return MERGE_FAN_OUT; }
+    int getMaxMergeFanIn() const { return MAX_MERGE_FAN_IN; }
+    int getMaxMergeFanOut() const { return MAX_MERGE_FAN_OUT; }
     PageCount getClusterSize() const { return CLUSTER_SIZE; }
 
 
@@ -184,11 +184,11 @@ class Storage {
         _totalSpaceInInputClusters = 0;
         _totalSpaceInOutputClusters = 0;
     }
-    virtual void setupMergeState(RowCount outputDevicePageSize, int fanIn) = 0;
-    /**
-     * @brief Setup merging state for dram (used for merging miniruns)
-     */
-    virtual int setupMergeStateForMiniruns(RowCount outputDevicePageSize) = 0;
+    // virtual void setupMergeState(RowCount outputDevicePageSize, int fanIn) = 0;
+    // /**
+    //  * @brief Setup merging state for dram (used for merging miniruns)
+    //  */
+    // virtual int setupMergeStateForMiniruns(RowCount outputDevicePageSize) = 0;
 
     // --------------------------- FILE I/O ------------------------------------
     std::string getReadFilePath() const { return readFilePath; }
@@ -213,9 +213,7 @@ class Storage {
     RunWriter *startSpillSession();
     void endSpillSession(RunWriter *writer, bool deleteCurrFile = false);
     int getRunfilesCount() {
-        if (runManager == nullptr) {
-            return 0;
-        }
+        if (runManager == nullptr) { return 0; }
         return runManager->getStoredRunsSortedBySize().size();
     }
 
@@ -242,21 +240,40 @@ class RunStreamer {
     Record *currentRecord;
     // if reader is not null, it will stream records from file
     // otherwise, it will stream records until currentRecord->next is null
-    RunReader *reader;
-    Storage *fromDevice;
-    Storage *toDevice;
-    Page *currentPage;
+    RunReader *reader = nullptr;
+    // if the input is a runstreamer;
+    RunStreamer *streamer = nullptr;
+    Storage *fromDevice = nullptr;
+    Storage *toDevice = nullptr;
+    Page *currentPage = nullptr;
     PageCount readAhead = 1;
     // read ahead pages
     RowCount readAheadPages(int nPages);
 
+    Record *moveNextForRun();
+    Record *moveNextForReader();
+    Record *moveNextForStreamer();
+
   public:
     RunStreamer(Run *run);
     RunStreamer(RunReader *reader, Storage *fromDevice, Storage *toDevice, PageCount readAhead = 1);
+    RunStreamer(RunStreamer *streamer, Storage *fromDevice, Storage *toDevice,
+                PageCount readAhead = 1);
 
     // getters
     Record *getCurrRecord() { return currentRecord; }
     Record *moveNext();
+    std::string getName() {
+        std::string name = "RS:";
+        if (reader != nullptr) {
+            name += " reader: " + reader->getFilename();
+        } else if (streamer != nullptr) {
+            name += " streamer: " + streamer->getName();
+        } else {
+            name += " InMemory";
+        }
+        return name;
+    }
 
     // default comparison based on first 8 bytes of data
     bool operator<(const RunStreamer &other) const { return *currentRecord < *other.currentRecord; }
