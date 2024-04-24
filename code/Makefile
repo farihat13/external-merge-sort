@@ -32,7 +32,7 @@ trace : ExternalSort.exe Makefile
 
 # run rule
 run: $(TARGET)
-	./$(TARGET) -c 250000 -s 1000
+	./$(TARGET) -c 2500000 -s 1000
 
 run1G: $(TARGET)
 	./$(TARGET) -c 1200000 -s 1000

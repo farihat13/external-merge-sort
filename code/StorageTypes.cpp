@@ -23,7 +23,7 @@ RowCount HDD::storeRun(Run &run) {
 
 
 void HDD::printStates(std::string where) {
-    printv("\t\t\t-- STATE_DETAILS: %s", where.c_str());
+    printv("\t\t------------ STATE_DETAILS: %s", where.c_str());
     printv("%s\n", DRAM::getInstance()->reprUsageDetails().c_str());
     printv("%s\n", SSD::getInstance()->reprUsageDetails().c_str());
     printv("%s\n", HDD::getInstance()->reprUsageDetails().c_str());
@@ -68,7 +68,7 @@ int HDD::setupMergeStateInSSDAndDRAM() {
     return fanIn;
 }
 
-std::vector<RunStreamer *> HDD::loadRunfilesToDRAM(size_t fanIn) {
+std::pair<std::vector<RunStreamer *>, RowCount> HDD::loadRunfilesToDRAM(size_t fanIn) {
 
     DRAM *_dram = DRAM::getInstance();
     SSD *_ssd = SSD::getInstance();
@@ -131,7 +131,7 @@ std::vector<RunStreamer *> HDD::loadRunfilesToDRAM(size_t fanIn) {
     }
     printv("\t\t\tAllRunTotal: %lld\n", allRunTotal);
 
-    return runStreamers;
+    return std::make_pair(runStreamers, allRunTotal);
 }
 
 void HDD::mergeHDDRuns() {
@@ -170,14 +170,16 @@ void HDD::mergeHDDRuns() {
     /**
      * 3. load the runs to streamers from SSD and HDD using RunReaders and RunStreamers
      */
-    std::vector<RunStreamer *> runStreamers = loadRunfilesToDRAM(fanIn);
+    auto pair = loadRunfilesToDRAM(fanIn);
+    std::vector<RunStreamer *> runStreamers = pair.first;
+    RowCount allRunTotal = pair.second;
+    printv("#runStreamers %d, allRunTotal %lld\n", runStreamers.size(), allRunTotal);
     // exit(0);
 
     /**
      * 4. merge the runs in DRAM
      */
     RowCount totalOutBufSizeDram = _dram->getTotalSpaceInOutputClusters();
-    // RowCount allRunTotal = this->runManager->getTotalRecords();
     LoserTree loserTree;
     loserTree.constructTree(runStreamers);
     RunWriter *writer = _ssd->getRunWriter();
@@ -187,10 +189,11 @@ void HDD::mergeHDDRuns() {
     RowCount nSorted = 0;
     RowCount runningCount = 0;
     while (true) {
+        // loserTree.printTree();
         Record *winner = loserTree.getNext();
         if (winner == NULL) { break; }
-        printv("rc: %d, winner %s\n", runningCount, winner->reprKey());
-        flushv();
+        // printv("rc: %d, winner %s\n", runningCount, winner->reprKey());
+        // flushv();
         current->next = winner;
         current = current->next;
         nSorted++;
@@ -199,21 +202,21 @@ void HDD::mergeHDDRuns() {
         //     printvv("ERROR: Merged run size exceeds %lld\n", allRunTotal);
         //     throw std::runtime_error("Merged run size exceeds");
         // }
-        if (runningCount > 10) {
-            exit(0); // TODO: remove this
-        }
+        // if (runningCount > 10) {
+        //     exit(0); // TODO: remove this
+        // }
         if (runningCount >= totalOutBufSizeDram) {
-            printv("runningCount %lld, nSorted %lld, totalOutBufSizeDram %lld\n", runningCount,
-                   nSorted, totalOutBufSizeDram);
+            // printv("runningCount %lld, nSorted %lld, totalOutBufSizeDram %lld\n", runningCount,
+            //    nSorted, totalOutBufSizeDram);
             flushv();
             // write the sorted records to SSD
             Run merged(head->next, runningCount);
             RowCount nRecord = writeNextChunk(writer, merged);
             printv("\t\t\tSTATE -> Merging runs, writing %llu records in output buffer to %s\n",
                    runningCount, writer->getFilename().c_str());
-            printv(
-                "\t\t\tACCESS -> A write to SSD was made with size %llu bytes and latency %d ms\n",
-                runningCount * Config::RECORD_SIZE, getSSDAccessTime(runningCount));
+            printv("\t\t\tACCESS -> A write to SSD was made with size %llu bytes and "
+                   "latency %d ms\n",
+                   runningCount * Config::RECORD_SIZE, getSSDAccessTime(runningCount));
             if (nRecord != runningCount) {
                 printvv("ERROR: Writing run to file: nRec %lld != runningCount %lld\n", nRecord,
                         runningCount);
@@ -237,10 +240,33 @@ void HDD::mergeHDDRuns() {
         assert(nRecord == runningCount && "ERROR: Writing run to file");
         // room for optimization
     }
-    exit(0); // TODO: remove this
-    printv("INFO: MERGE_HDD_RUNS COMPLETE\n");
+
+    /**
+     * 5.
+     * -> close the RunWriter that was storing the merged run, the SSD used space should be updated
+     *by the writeNextChunk,
+     * -> delete the run file entries from the run manager the actual files has already been deleted
+     *by the runreader and endspillsession
+     * -> reset the dram, it should be empty now
+     **/
+    _ssd->closeWriter(writer);
+    for (auto streamer : runStreamers) {
+        std::string runFilename = streamer->getFilename();
+        bool removed = _ssd->runManager->removeRunFile(runFilename);
+        if (!removed) { // this is a file from HDD
+            _hdd->runManager->removeRunFile(runFilename);
+        }
+        delete streamer;
+    }
+    _dram->reset();
+    // print all device information
+    printv("\t\t\tINFO: MERGE_HDD_RUNS COMPLETE %lld records in SSD\n", nSorted);
     printStates("DEBUG: after mergeHDDRuns:");
     flushv();
+
+    assert(nSorted == allRunTotal && "ERROR: Merged run size mismatch in mergeHDDRuns");
+
+    // exit(0); // TODO: remove this
 }
 
 

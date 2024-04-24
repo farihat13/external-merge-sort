@@ -14,7 +14,7 @@ class HDD : public Storage {
 
     // ---- only needed for mergeHDDRuns ----
     int setupMergeStateInSSDAndDRAM();
-    std::vector<RunStreamer *> loadRunfilesToDRAM(size_t fanIn);
+    std::pair<std::vector<RunStreamer *>, RowCount> loadRunfilesToDRAM(size_t fanIn);
 
   protected:
     HDD(std::string name = DISK_NAME, ByteCount capacity = Config::HDD_CAPACITY,
