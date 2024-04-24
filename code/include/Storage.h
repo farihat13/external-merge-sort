@@ -43,14 +43,16 @@ class RunManager {
         totalRecords += nRecords;
     }
 
-    void removeRunFile(std::string filename) {
+    bool removeRunFile(std::string filename) {
         auto it = std::find_if(
             runFiles.begin(), runFiles.end(),
             [filename](const std::pair<std::string, RowCount> &p) { return p.first == filename; });
         if (it != runFiles.end()) {
             totalRecords -= it->second;
             runFiles.erase(it);
+            return true;
         }
+        return false;
     }
 
     // getters
@@ -237,6 +239,7 @@ class Storage {
  */
 class RunStreamer {
   private:
+    /** NOTE: must update currentRecord in moveNext */
     Record *currentRecord;
     // if reader is not null, it will stream records from file
     // otherwise, it will stream records until currentRecord->next is null
@@ -273,6 +276,15 @@ class RunStreamer {
             name += " InMemory";
         }
         return name;
+    }
+
+    std::string getFilename() {
+        if (reader != nullptr) {
+            return reader->getFilename();
+        } else if (streamer != nullptr) {
+            return streamer->getFilename();
+        }
+        return "InMemory";
     }
 
     // default comparison based on first 8 bytes of data

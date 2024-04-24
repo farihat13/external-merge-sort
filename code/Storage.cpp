@@ -443,13 +443,15 @@ Record *RunStreamer::moveNextForReader() {
         // move to the next record
         currentRecord = currentRecord->next;
     }
+    // printv("moving next to %s for reader %s\n", currentRecord->reprKey(), getName().c_str());
     return currentRecord;
 }
 
 Record *RunStreamer::moveNextForStreamer() {
     // if streamer exists
-    return streamer->moveNext();
-    printv("DEBUG: moving next for streamer %s\n", getName().c_str());
+    currentRecord = streamer->moveNext();
+    // printv("moving next to %s for streamer %s\n", currentRecord->reprKey(), getName().c_str());
+    return currentRecord;
 }
 
 Record *RunStreamer::moveNext() {

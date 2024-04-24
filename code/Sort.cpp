@@ -155,7 +155,7 @@ void SortIterator::firstPass() {
             }
         }
         ++mergeIteration;
-        break; // TODO: remove this
+        // break; // TODO: remove this
     }
 
 #if defined(_VALIDATE)

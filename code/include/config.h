@@ -111,16 +111,16 @@ extern std::ofstream logFile;
 void printVerbose(bool vv, char const *const file, int const line, char const *const function,
                   const char *format, ...);
 void flushVerbose();
+#define printvv(...) printVerbose(true, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define flushv() flushVerbose()
 #if defined(_DEBUG) || defined(DEBUG)
 // Only define the printv and printvv macros if in a debug build
 #define printv(...) printVerbose(false, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
-#define printvv(...) printVerbose(true, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
-#define flushv() flushVerbose()
 #else
 // Define empty macros when not in debug mode
 #define printv(...) ((void)0)
-#define printvv(...) ((void)0)
-#define flushv() ((void)0)
+// #define printvv(...) ((void)0)
+// #define flushv() ((void)0)
 #endif
 
 
