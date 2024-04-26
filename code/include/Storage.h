@@ -116,6 +116,10 @@ class Storage {
         printv("%s set SpillTo to %s\n", this->getName().c_str(), spillTo->getName().c_str());
     }
 
+    ~Storage() {
+        if (runManager != nullptr) { delete runManager; }
+    }
+
   public:
     // ------------------------ configurations ---------------------------------
     std::string getName() const { return name; }

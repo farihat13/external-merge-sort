@@ -36,6 +36,104 @@ void gen_a_record(char *s, const int len) {
 } // ScanIterator::gen_a_record
 
 
+RowCount genInput(const std::string &filename, const RowCount count) {
+    // seed random number generator if debug is not defined
+    srand(time(0));
+#if defined(_DEBUG)
+    // seed is fixed for reproducibility
+    // srand(100);
+#endif
+    traceprintf("generating input file '%s'\n", filename.c_str());
+    std::string tmpfilename = filename + ".tmp";
+    std::ofstream input_file(tmpfilename, std::ios::binary);
+    char *record = new char[Config::RECORD_SIZE];
+    for (RowCount i = 0; i < count; i++) {
+        gen_a_record(record, Config::RECORD_SIZE);
+        record[Config::RECORD_SIZE - 1] = '\n'; // TODO: remove later
+        input_file.write(record, Config::RECORD_SIZE);
+    }
+    input_file.close();
+    // rename the file
+    rename(tmpfilename.c_str(), filename.c_str());
+    // cleanup
+    delete[] record;
+    return count;
+}
+
+RowCount genInputBatch(const std::string &filename, const RowCount count) {
+    srand(time(0));
+#if defined(_DEBUG)
+    // seed is fixed for reproducibility
+    // srand(100);
+#endif
+    traceprintf("generating input file '%s'\n", filename.c_str());
+    std::string tmpfilename = filename + ".tmp";
+    std::ofstream input_file(tmpfilename, std::ios::binary | std::ios::trunc);
+
+    /**
+     * generate records in batches
+     */
+    // calculate batch size and number of batches
+    RowCount batchSize = 4096;
+    batchSize = std::min(batchSize, count);
+    if (batchSize % 2 != 0) { batchSize--; }
+    RowCount nBatches = batchSize == 0 ? 0 : (count / batchSize);
+    // allocate buffer for batch records
+    char *buffer = new char[Config::RECORD_SIZE * batchSize];
+    RowCount n = 0;
+    RowCount dup = 0;
+    for (RowCount i = 0; i < nBatches; i++) {
+        char *record = buffer;
+#if defined(_DUP_GEN)
+        for (RowCount j = 0; j < batchSize / 2; j++) {
+            gen_a_record(record, Config::RECORD_SIZE);
+            record[Config::RECORD_SIZE - 1] = '\n'; // TODO: remove later
+            n++;
+            record += Config::RECORD_SIZE;
+        }
+        char *duplicate = buffer;
+        for (RowCount j = 0; j < batchSize / 2; j++) {
+            memcpy(record, duplicate, Config::RECORD_SIZE);
+            n++;
+            record += Config::RECORD_SIZE;
+            duplicate += Config::RECORD_SIZE;
+            dup++;
+        }
+#else
+        for (RowCount j = 0; j < batchSize; j++) {
+            gen_a_record(record, Config::RECORD_SIZE);
+            record[Config::RECORD_SIZE - 1] = '\n'; // TODO: remove later
+            n++;
+            record += Config::RECORD_SIZE;
+        }
+#endif
+        input_file.write(buffer, Config::RECORD_SIZE * batchSize);
+        // printv("%lld\n", n);
+    }
+    batchSize = count % batchSize;
+    if (batchSize > 0) {
+        char *record = buffer;
+        for (RowCount j = 0; j < batchSize; j++) {
+            gen_a_record(record, Config::RECORD_SIZE);
+            record[Config::RECORD_SIZE - 1] = '\n'; // TODO: remove later
+            n++;
+            record += Config::RECORD_SIZE;
+        }
+        input_file.write(buffer, Config::RECORD_SIZE * batchSize);
+        // printv("%lld\n", n);
+    }
+    traceprintf("generated %lu records (%lu of them are duplicate)\n", n, dup);
+    input_file.close();
+    // rename the file
+    rename(tmpfilename.c_str(), filename.c_str());
+
+    // cleanup
+    delete[] buffer;
+    // return
+    return n;
+}
+
+
 Iterator *ScanPlan::init() const {
     TRACE(true);
     return new ScanIterator(this);
@@ -47,28 +145,16 @@ ScanIterator::ScanIterator(ScanPlan const *const plan) : _plan(plan), _count(0) 
     TRACE(true);
     // skip if the input file already exists
     if (!std::ifstream(plan->_filename.c_str())) {
-        // seed random number generator if debug is not defined
-        srand(time(0));
-#if defined(_DEBUG)
-        // seed is fixed for reproducibility
-        // srand(100);
-#endif
-        traceprintf("generating input file '%s'\n", plan->_filename.c_str());
-        std::ofstream input_file(_plan->_filename, std::ios::binary);
-        char *record = new char[Config::RECORD_SIZE];
-        for (RowCount i = 0; i < plan->_count; i++) {
-            gen_a_record(record, Config::RECORD_SIZE);
-            record[Config::RECORD_SIZE - 1] = '\n'; // TODO: remove later
-            input_file.write(record, Config::RECORD_SIZE);
+        // RowCount n = genInput(plan->_filename, plan->_count);
+        RowCount n = genInputBatch(plan->_filename, plan->_count);
+        if (n != plan->_count) {
+            printv("ERROR: generated %lld records instead of %lld\n", n, plan->_count);
+            exit(1);
         }
-        input_file.close();
-        traceprintf("generated %lu records\n", (unsigned long)(plan->_count));
-        delete[] record;
     }
     // NOTE: did not update HDD usage value since its capacity is infinite
-    printv("INFO: input filename: '%s'\n", _plan->_filename.c_str());
-    printv("\tinput file size %llu bytes / %llu MB / %llu GB\n", getInputSizeInBytes(),
-           BYTE_TO_MB(getInputSizeInBytes()), BYTE_TO_GB(getInputSizeInBytes()));
+    traceprintf("\tinput file %s, size %s\n", _plan->_filename.c_str(),
+                getSizeDetails(_plan->_count * Config::RECORD_SIZE).c_str());
     printv("\tinput file has %llu records\n", _plan->_count);
 
 } // ScanIterator::ScanIterator

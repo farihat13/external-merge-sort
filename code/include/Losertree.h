@@ -40,7 +40,7 @@ class LoserTree {
     }
 
     // print the tree
-    char *repr() {
+    std::string repr() {
         std::stringstream ss;
         ss << "loser tree (" << name << "):";
         for (size_t i = 0; i < loserTree.size(); i++) {
@@ -50,9 +50,9 @@ class LoserTree {
                 ss << "[" << i << "]:" << loserTree[i]->repr() << " ";
         }
         std::string str = ss.str();
-        return strdup(str.c_str());
+        return str;
     }
-    void printTree() { printv("%s\n", repr()); }
+    void printTree() { printv("%s\n", repr().c_str()); }
 
 
     void constructTree(std::vector<Run> &inputs) {

@@ -48,6 +48,7 @@ RunManager::~RunManager() {
     if (getRunInfoFromDir().size() > 0) {
         printvv("WARNING: %d run files left in %s\n", runFiles.size(), baseDir.c_str());
     }
+    printv("\tINFO: RunManager deleted for %s\n", baseDir.c_str());
 }
 
 

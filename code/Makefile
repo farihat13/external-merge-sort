@@ -1,5 +1,5 @@
 # compiler options
-CPPOPT=-g -Og -D_DEBUG -D_VALIDATE #-D_USE_LOGFILE
+CPPOPT=-g -Og -D_DEBUG -D_VALIDATE #-D_USE_LOGFILE #-D_DUP_CHECK #-DUP_GEN
 # -O2 -Os -Ofast
 # -fprofile-generate -fprofile-use
 # -fsanitize=address -fsanitize=leak -fsanitize=undefined
@@ -37,6 +37,12 @@ run: $(TARGET)
 run1G: $(TARGET)
 	./$(TARGET) -c 1200000 -s 1000
 
+run20G: $(TARGET)
+	./$(TARGET) -c 20971520 -s 1024
+
+run125G: $(TARGET)
+	./$(TARGET) -c 131072000 -s 1024
+
 run2G: $(TARGET)
 	@date > trace
 	./$(TARGET) -c 3000000 -s 1000 >> trace
@@ -57,4 +63,4 @@ clean :
 
 cleanall:
 	@rm -f $(OBJS) ExternalSort.exe ExternalSort.exe.stackdump trace list count input*.txt output*.txt
-	@rm -rf HDD_runs SSD_runs DRAM_runs
+	@rm -rf HDD_runs SSD_runs DRAM_runs *.tmp
