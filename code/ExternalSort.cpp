@@ -90,6 +90,7 @@ void cleanup() {
     // printv("deleted SSD\n");
     // delete DRAM::getInstance();
     // printv("deleted DRAM\n");
+    delete getMaxRecord();
     printf("cleanup done\n");
 }
 

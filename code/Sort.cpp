@@ -121,6 +121,8 @@ void SortIterator::firstPass() {
     }
     _hdd->closeRead(); // close the input file
 
+    _ssd->mergeSSDRuns(_hdd);
+
 
     // 4. Merge all runs from SSD to HDD
     int mergeIteration = 0;
