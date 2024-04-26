@@ -64,7 +64,7 @@ void readCmdlineArgs(int argc, char *argv[]) {
     Config::NUM_RECORDS = num_records;
     Config::TRACE_FILE = trace_file;
     Config::INPUT_FILE = "input-c" + std::to_string(Config::NUM_RECORDS) + "-s" +
-                         std::to_string(Config::RECORD_SIZE) + ".txt";
+                         std::to_string(Config::RECORD_SIZE) + ".txt"; // TODO
 } // readCmdlineArgs
 
 
@@ -72,6 +72,15 @@ void readCmdlineArgs(int argc, char *argv[]) {
  * initialize at the very beginning, just after processing command line arguments
  */
 void init() {
+#if defined(_SMALL)
+    Config::DRAM_CAPACITY = 1LL * 10 * 1024 * 1024; // 100 MB
+    Config::SSD_CAPACITY = 1LL * 25 * 1024 * 1024;  // 10GB
+    Config::RECORD_SIZE = 1000;                     // 1024 bytes
+    Config::NUM_RECORDS = 60000;                    // 20 records
+    Config::INPUT_FILE = "input-c" + std::to_string(Config::NUM_RECORDS) + "-s" +
+                         std::to_string(Config::RECORD_SIZE) + ".txt";
+    printv("WARNING: Running in SMALL mode\n");
+#endif
     printConfig();
     HDD::getInstance();
     SSD::getInstance();
