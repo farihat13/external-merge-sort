@@ -2,6 +2,7 @@
 #include "Iterator.h"
 #include "Scan.h"
 #include "Sort.h"
+#include "Verify.h"
 #include "config.h"
 #include "defs.h"
 #include <cstdio>
@@ -96,9 +97,15 @@ void cleanup() {
 
 
 int main(int argc, char *argv[]) {
-
     // read command line arguments
     readCmdlineArgs(argc, argv);
+
+#if defined(_VALIDATE)
+    uint64_t capacityMB = 1024;
+    verifyOrder("Verify_parts/output.txt", capacityMB);
+    verifyIntegrity("Verify_parts/input-duplicated.txt", "Verify_parts/output.txt", capacityMB);
+    return 0;
+#endif
 
     // initialize anything needed
     init();

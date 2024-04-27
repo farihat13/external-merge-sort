@@ -1,5 +1,5 @@
 # compiler options
-CPPOPT=-g -Og -D_DEBUG -D_VALIDATE #-D_USE_LOGFILE #-D_DUP_CHECK #-DUP_GEN
+CPPOPT=-g -Og -D_DEBUG -D_VALIDATE -D_VERIFY #-D_USE_LOGFILE #-D_DUP_CHECK #-DUP_GEN
 # -O2 -Os -Ofast
 # -fprofile-generate -fprofile-use
 # -fsanitize=address -fsanitize=leak -fsanitize=undefined
@@ -52,6 +52,9 @@ run100M: $(TARGET)
 #	@date > trace
 	./$(TARGET) -c 100000 -s 1000 
 #	@size -t $(TARGET) $(OBJS) | sort -r >> trace
+
+verify: $(TARGET)
+	./$(TARGET) -c 10 -s 1000
 
 list : Makefile
 	echo Makefile $(HDRS) $(SRCS) $(DOCS) $(SCRS) > list
