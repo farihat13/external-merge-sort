@@ -56,8 +56,13 @@ std::ofstream openWriteFile(const std::string &filePath) {
 }
 
 
-bool verifyOrder(const std::string &outputFilePath, RowCount nRecordsPerRead) {
+bool verifyOrder(const std::string &outputFilePath, uint64_t capacityMB) {
+    printf("============= Verifying order =============\n");
+
     std::ifstream outputFile = openReadFile(outputFilePath);
+
+    uint64_t capacityBytes = capacityMB * 1024 * 1024;
+    RowCount nRecordsPerRead = capacityBytes / Config::RECORD_SIZE;
 
     // read first record
     RowCount nRecordsLoaded = 0;
@@ -75,7 +80,7 @@ bool verifyOrder(const std::string &outputFilePath, RowCount nRecordsPerRead) {
         if (nRecordsLoaded == 0) {
             data = readRecordsFromFile(outputFile, nRecordsPerRead, &nRecordsLoaded);
             if (data == nullptr || nRecordsLoaded == 0) {
-                printvv("WARNING: no records read\n");
+                printf("Finished reading output\n");
                 break;
             }
             nRecords += nRecordsLoaded;
@@ -84,6 +89,8 @@ bool verifyOrder(const std::string &outputFilePath, RowCount nRecordsPerRead) {
         Record *record = new Record(data);
         if (record < prevRecord) {
             printvv("ERROR: Record %ld is not sorted\n", i);
+            outputFile.close();
+            printf("============= Order verification failed =============\n");
             return false;
         }
 
@@ -92,10 +99,178 @@ bool verifyOrder(const std::string &outputFilePath, RowCount nRecordsPerRead) {
         data += Config::RECORD_SIZE;
     }
     printf("Order verified with %ld records\n", nRecords);
+    outputFile.close();
+    printf("============= Order verification successful =============\n");
     return true;
 }
 
-bool verifyIntegrity(const std::string &inputFilePath, const std::string &outputFilePath) {
-    printf("Testing\n");
+
+u_int64_t hash(Record *record, u_int64_t nPartitions) {
+    // record is n bytes, key is 8 bytes and value is n-8 bytes
+    // hash using key
+    char *key = record->reprKey();
+    u_int64_t hash = 0;
+    for (int i = 0; i < 8; i++) {
+        hash = (hash << 5) + hash + key[i];
+    }
+    delete[] key;
+    return hash % nPartitions;
+}
+
+
+void partitionFile(const std::string &inputFilePath, const std::string &hashFilesDir,
+                   u_int64_t nPartitions, RowCount nRecordsPerRead) {
+    std::ifstream inputFile = openReadFile(inputFilePath);
+
+    // create partitioned files
+    std::ofstream *outputFiles = new std::ofstream[nPartitions];
+    for (u_int64_t i = 0; i < nPartitions; i++) {
+        std::string outputFilePath = hashFilesDir + std::to_string(i) + ".txt";
+        outputFiles[i] = openWriteFile(outputFilePath);
+    }
+
+    RowCount nRecordsLoaded = 0;
+    char *data;
+
+    // read input file in batches and hash partition it
+    while (1) {
+        data = readRecordsFromFile(inputFile, nRecordsPerRead, &nRecordsLoaded);
+        if (data == nullptr || nRecordsLoaded == 0) {
+            break;
+        }
+
+        for (RowCount i = 0; i < nRecordsLoaded; i++) {
+            Record *record = new Record(data + i * Config::RECORD_SIZE);
+            u_int64_t partition = hash(record, nPartitions);
+            outputFiles[partition].write(record->data, Config::RECORD_SIZE);
+        }
+    }
+
+    for (u_int64_t i = 0; i < nPartitions; i++) {
+        outputFiles[i].close();
+    }
+}
+
+bool contains(const std::vector<Record *> &arr, Record *target) {
+    int left = 0;
+    int right = arr.size() - 1;
+
+    while (left <= right) {
+        int mid = left + (right - left) / 2; // Prevent potential overflow
+
+        int compare = std::strncmp(arr[mid]->data, target->data, Config::RECORD_SIZE);
+
+        if (compare == 0) {
+            return true;
+        } else if (compare < 0) {
+            left = mid + 1;
+        } else {
+            right = mid - 1;
+        }
+    }
+
+    return false;
+}
+
+
+void cleanDirectory(const std::string &dirPath) {
+    // std::string command = "rm -rf " + dirPath;
+    // system(command.c_str());
+
+    std::remove(dirPath.c_str());
+    mkdir(dirPath.c_str(), 0700);
+}
+
+
+bool verifyIntegrity(const std::string &inputFilePath, const std::string &outputFilePath,
+                     uint64_t capacityMB) {
+
+    printf("============= Verifying integrity =============\n");
+
+    // delete existing hash partitioned files
+    std::string inputDir = "Verify_parts/input/";
+    std::string outputDir = "Verify_parts/output/";
+    cleanDirectory(inputDir);
+    cleanDirectory(outputDir);
+
+
+    std::ifstream inputFile = openReadFile(inputFilePath);
+    std::ifstream outputFile = openReadFile(outputFilePath);
+
+    uint64_t capacityBytes = capacityMB * 1024 * 1024;
+    uint64_t matchCapacityBytes = capacityBytes / 2;
+
+    // expecting partition of this size matchCapacityBytes
+    // handle skew, reducing partition size to half
+    uint64_t expectedPartitionBytes = matchCapacityBytes / 2;
+    uint64_t expectedRecordsPerPartition = expectedPartitionBytes / Config::RECORD_SIZE;
+    uint64_t nPartitions = Config::NUM_RECORDS / expectedRecordsPerPartition;
+    nPartitions = nPartitions == 0 ? 1 : nPartitions;
+
+    printf("Number of partitions: %ld\n", nPartitions);
+
+    // read input file in batches and hash partition it
+    uint64_t nRecordsPerRead = matchCapacityBytes / Config::RECORD_SIZE;
+    partitionFile(inputFilePath, inputDir, nPartitions, nRecordsPerRead);
+    printf("Partitioned input file\n");
+    partitionFile(outputFilePath, outputDir, nPartitions, nRecordsPerRead);
+    printf("Partitioned output file\n");
+
+    // compare hash partitioned files
+    for (u_int64_t i = 0; i < nPartitions; i++) {
+        std::string inputFilePath = inputDir + std::to_string(i) + ".txt";
+        std::string outputFilePath = outputDir + std::to_string(i) + ".txt";
+        std::ifstream inputPartition = openReadFile(inputFilePath);
+        std::ifstream outputPartition = openReadFile(outputFilePath);
+
+        // check if exists
+        if (!inputPartition.is_open() && !outputPartition.is_open()) {
+            continue;
+        }
+        if (!inputPartition.is_open()) {
+            printvv("ERROR: Failed to open input partition file '%s'\n", inputFilePath.c_str());
+            outputPartition.close();
+            printf("============= Integrity verification failed =============\n");
+            return false;
+        }
+        if (!outputPartition.is_open()) {
+            printvv("ERROR: Failed to open output partition file '%s'\n", outputFilePath.c_str());
+            inputPartition.close();
+            printf("============= Integrity verification failed =============\n");
+            return false;
+        }
+
+        RowCount nInputRecordsLoaded = 0, nOutputRecordsLoaded = 0;
+        char *inputData =
+            readRecordsFromFile(inputPartition, nRecordsPerRead, &nInputRecordsLoaded);
+        char *outputData =
+            readRecordsFromFile(outputPartition, nRecordsPerRead, &nOutputRecordsLoaded);
+
+        // printf("Number of records loaded: %ld %ld\n", nInputRecordsLoaded, nOutputRecordsLoaded);
+
+        std::vector<Record *> outputRecordsVec;
+        for (uint64_t j = 0; j < nOutputRecordsLoaded; j++) {
+            Record *record = new Record(outputData + j * Config::RECORD_SIZE);
+            outputRecordsVec.push_back(record);
+        }
+
+        for (uint64_t j = 0; j < nInputRecordsLoaded; j++) {
+            Record *record = new Record(inputData + j * Config::RECORD_SIZE);
+            bool found = contains(outputRecordsVec, record);
+
+            if (!found) {
+                inputPartition.close();
+                outputPartition.close();
+                printvv("ERROR: Record %ld not found in output partition\n", j);
+                printf("============= Integrity verification failed =============\n");
+                return false;
+            }
+        }
+
+        inputPartition.close();
+        outputPartition.close();
+    }
+    printf("SUCCESS: Integrity verified\n");
+    printf("============= Integrity verification successful =============\n");
     return true;
 }
