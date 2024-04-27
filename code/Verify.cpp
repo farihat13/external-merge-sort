@@ -203,6 +203,65 @@ void cleanDirectory(const std::string &dirPath) {
     }
 }
 
+bool compareHashFiles(uint64_t i, const std::string &inputDir, const std::string &outputDir,
+                      uint64_t nRecordsPerRead, RowCount &nInputRecordsLoaded,
+                      RowCount &nOutputRecordsLoaded) {
+    std::string inputFilePath = inputDir + std::to_string(i) + ".txt";
+    std::string outputFilePath = outputDir + std::to_string(i) + ".txt";
+    std::ifstream inputPartition = openReadFile(inputFilePath);
+    std::ifstream outputPartition = openReadFile(outputFilePath);
+
+    bool integrity = true;
+
+    // check if exists
+    if (!inputPartition.is_open() && !outputPartition.is_open()) {
+        return true;
+    }
+    if (!inputPartition.is_open()) {
+        printvv("ERROR: Failed to open input partition file '%s'\n", inputFilePath.c_str());
+        outputPartition.close();
+        return false;
+    }
+    if (!outputPartition.is_open()) {
+        printvv("ERROR: Failed to open output partition file '%s'\n", outputFilePath.c_str());
+        inputPartition.close();
+        return false;
+    }
+
+    char *inputData = readRecordsFromFile(inputPartition, nRecordsPerRead, &nInputRecordsLoaded);
+    char *outputData = readRecordsFromFile(outputPartition, nRecordsPerRead, &nOutputRecordsLoaded);
+
+    printf("Number of records loaded for partition %ld: %ld %ld\n", i, nInputRecordsLoaded,
+           nOutputRecordsLoaded);
+
+    std::vector<Record *> outputRecordsVec;
+    for (uint64_t j = 0; j < nOutputRecordsLoaded; j++) {
+        Record *record = new Record(outputData + j * Config::RECORD_SIZE);
+        outputRecordsVec.push_back(record);
+    }
+
+    for (uint64_t j = 0; j < nInputRecordsLoaded && integrity; j++) {
+        Record *record = new Record(inputData + j * Config::RECORD_SIZE);
+        bool found = contains(outputRecordsVec, record);
+
+        if (!found) {
+            printvv("ERROR: Record %ld not found in output partition\n", j);
+            integrity = false;
+        }
+        free(record);
+    }
+
+    for (uint64_t j = 0; j < nOutputRecordsLoaded; j++) {
+        free(outputRecordsVec[j]);
+    }
+
+    free(outputData);
+    free(inputData);
+    inputPartition.close();
+    outputPartition.close();
+
+    return integrity;
+}
 
 bool verifyIntegrity(const std::string &inputFilePath, const std::string &outputFilePath,
                      uint64_t capacityMB) {
@@ -239,66 +298,21 @@ bool verifyIntegrity(const std::string &inputFilePath, const std::string &output
 
     // compare hash partitioned files
     printf("Comparing hash partitioned files\n");
+    RowCount totalInputRecords = 0, totalOutputRecords = 0;
     bool integrity = true;
     for (u_int64_t i = 0; i < nPartitions && integrity; i++) {
-        std::string inputFilePath = inputDir + std::to_string(i) + ".txt";
-        std::string outputFilePath = outputDir + std::to_string(i) + ".txt";
-        std::ifstream inputPartition = openReadFile(inputFilePath);
-        std::ifstream outputPartition = openReadFile(outputFilePath);
-
-        // check if exists
-        if (!inputPartition.is_open() && !outputPartition.is_open()) {
-            continue;
-        }
-        if (!inputPartition.is_open()) {
-            printvv("ERROR: Failed to open input partition file '%s'\n", inputFilePath.c_str());
-            outputPartition.close();
-            printf("============= Integrity verification failed =============\n");
-            return false;
-        }
-        if (!outputPartition.is_open()) {
-            printvv("ERROR: Failed to open output partition file '%s'\n", outputFilePath.c_str());
-            inputPartition.close();
-            printf("============= Integrity verification failed =============\n");
-            return false;
-        }
-
         RowCount nInputRecordsLoaded = 0, nOutputRecordsLoaded = 0;
-        char *inputData =
-            readRecordsFromFile(inputPartition, nRecordsPerRead, &nInputRecordsLoaded);
-        char *outputData =
-            readRecordsFromFile(outputPartition, nRecordsPerRead, &nOutputRecordsLoaded);
-
-        printf("Number of records loaded for partition %ld: %ld %ld\n", i, nInputRecordsLoaded,
-               nOutputRecordsLoaded);
-
-        std::vector<Record *> outputRecordsVec;
-        for (uint64_t j = 0; j < nOutputRecordsLoaded; j++) {
-            Record *record = new Record(outputData + j * Config::RECORD_SIZE);
-            outputRecordsVec.push_back(record);
-        }
-
-        for (uint64_t j = 0; j < nInputRecordsLoaded && integrity; j++) {
-            Record *record = new Record(inputData + j * Config::RECORD_SIZE);
-            bool found = contains(outputRecordsVec, record);
-
-            if (!found) {
-                printvv("ERROR: Record %ld not found in output partition\n", j);
-                integrity = false;
-            }
-            free(record);
-        }
-
-        for (uint64_t j = 0; j < nOutputRecordsLoaded; j++) {
-            free(outputRecordsVec[j]);
-        }
-
-        free(outputData);
-        free(inputData);
-        inputPartition.close();
-        outputPartition.close();
+        integrity = compareHashFiles(i, inputDir, outputDir, nRecordsPerRead, nInputRecordsLoaded,
+                                     nOutputRecordsLoaded);
+        totalInputRecords += nInputRecordsLoaded;
+        totalOutputRecords += nOutputRecordsLoaded;
     }
+
     if (integrity) {
+        printf("Total input records generated: %ld\n", Config::NUM_RECORDS);
+        printf("Total input records verified: %ld\n", totalInputRecords);
+        printf("Total output records verified: %ld\n", totalOutputRecords);
+        printf("Duplicates removed: %ld\n", totalInputRecords - totalOutputRecords);
         printf("SUCCESS: Integrity verified\n");
         printf("============= Integrity verification successful =============\n");
     } else {
