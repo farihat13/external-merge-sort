@@ -63,9 +63,12 @@ bool verifyOrder(const std::string &outputFilePath, RowCount nRecordsPerRead) {
     RowCount nRecordsLoaded = 0;
     char *data = readRecordsFromFile(outputFile, nRecordsPerRead, &nRecordsLoaded);
     Record *prevRecord = new Record(data);
+    RowCount nRecords = nRecordsLoaded;
+    RowCount i = 1;
 
+    printf("Number of records per read: %ld\n", nRecordsLoaded);
 
-    for (RowCount i = 1; i < Config::NUM_RECORDS; i++) {
+    while (1) {
         nRecordsLoaded--;
 
         // fetch new data if needed
@@ -73,8 +76,9 @@ bool verifyOrder(const std::string &outputFilePath, RowCount nRecordsPerRead) {
             data = readRecordsFromFile(outputFile, nRecordsPerRead, &nRecordsLoaded);
             if (data == nullptr || nRecordsLoaded == 0) {
                 printvv("WARNING: no records read\n");
-                return false;
+                break;
             }
+            nRecords += nRecordsLoaded;
         }
 
         Record *record = new Record(data);
@@ -83,10 +87,11 @@ bool verifyOrder(const std::string &outputFilePath, RowCount nRecordsPerRead) {
             return false;
         }
 
+        i += 1;
         prevRecord = record;
         data += Config::RECORD_SIZE;
     }
-    printf("Order verified\n");
+    printf("Order verified with %ld records\n", nRecords);
     return true;
 }
 
