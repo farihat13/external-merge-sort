@@ -72,8 +72,9 @@ bool verifyOrder(const std::string &outputFilePath, uint64_t capacityMB) {
     RowCount i = 1;
 
     printf("Number of records per read: %ld\n", nRecordsLoaded);
+    bool ordered = true;
 
-    while (1) {
+    while (ordered) {
         nRecordsLoaded--;
 
         // fetch new data if needed
@@ -87,21 +88,32 @@ bool verifyOrder(const std::string &outputFilePath, uint64_t capacityMB) {
         }
 
         Record *record = new Record(data);
-        if (record < prevRecord) {
+        int compare = std::strncmp(prevRecord->data, record->data, Config::RECORD_SIZE);
+        if (compare > 0) {
             printvv("ERROR: Record %ld is not sorted\n", i);
-            outputFile.close();
-            printf("============= Order verification failed =============\n");
-            return false;
+            ordered = false;
         }
 
         i += 1;
+        free(prevRecord);
         prevRecord = record;
         data += Config::RECORD_SIZE;
     }
-    printf("Order verified with %ld records\n", nRecords);
+
+    // cleanup
+    free(data);
     outputFile.close();
-    printf("============= Order verification successful =============\n");
-    return true;
+
+
+    if (ordered) {
+        printf("Order verified with %ld records\n", nRecords);
+        printf("============= Order verification successful =============\n");
+    } else {
+        printf("Order verification failed\n");
+        printf("============= Order verification failed =============\n");
+    }
+
+    return ordered;
 }
 
 
@@ -143,12 +155,17 @@ void partitionFile(const std::string &inputFilePath, const std::string &hashFile
             Record *record = new Record(data + i * Config::RECORD_SIZE);
             u_int64_t partition = hash(record, nPartitions);
             outputFiles[partition].write(record->data, Config::RECORD_SIZE);
+            // free(record);
+            record->data = nullptr;
         }
+        free(data);
     }
 
     for (u_int64_t i = 0; i < nPartitions; i++) {
         outputFiles[i].close();
     }
+    inputFile.close();
+    delete[] outputFiles;
 }
 
 bool contains(const std::vector<Record *> &arr, Record *target) {
@@ -157,7 +174,6 @@ bool contains(const std::vector<Record *> &arr, Record *target) {
 
     while (left <= right) {
         int mid = left + (right - left) / 2; // Prevent potential overflow
-
         int compare = std::strncmp(arr[mid]->data, target->data, Config::RECORD_SIZE);
 
         if (compare == 0) {
@@ -174,11 +190,17 @@ bool contains(const std::vector<Record *> &arr, Record *target) {
 
 
 void cleanDirectory(const std::string &dirPath) {
-    // std::string command = "rm -rf " + dirPath;
-    // system(command.c_str());
-
-    std::remove(dirPath.c_str());
-    mkdir(dirPath.c_str(), 0700);
+    // remove directory and create again
+    std::string command = "rm -rf " + dirPath;
+    int code = system(command.c_str());
+    if (code == -1) {
+        printvv("ERROR: Failed to remove directory '%s'\n", dirPath.c_str());
+    }
+    command = "mkdir -p " + dirPath;
+    code = system(command.c_str());
+    if (code == -1) {
+        printvv("ERROR: Failed to create directory '%s'\n", dirPath.c_str());
+    }
 }
 
 
@@ -204,8 +226,7 @@ bool verifyIntegrity(const std::string &inputFilePath, const std::string &output
     // handle skew, reducing partition size to half
     uint64_t expectedPartitionBytes = matchCapacityBytes / 2;
     uint64_t expectedRecordsPerPartition = expectedPartitionBytes / Config::RECORD_SIZE;
-    uint64_t nPartitions = Config::NUM_RECORDS / expectedRecordsPerPartition;
-    nPartitions = nPartitions == 0 ? 1 : nPartitions;
+    uint64_t nPartitions = ceil(Config::NUM_RECORDS * 1.0 / expectedRecordsPerPartition);
 
     printf("Number of partitions: %ld\n", nPartitions);
 
@@ -217,7 +238,9 @@ bool verifyIntegrity(const std::string &inputFilePath, const std::string &output
     printf("Partitioned output file\n");
 
     // compare hash partitioned files
-    for (u_int64_t i = 0; i < nPartitions; i++) {
+    printf("Comparing hash partitioned files\n");
+    bool integrity = true;
+    for (u_int64_t i = 0; i < nPartitions && integrity; i++) {
         std::string inputFilePath = inputDir + std::to_string(i) + ".txt";
         std::string outputFilePath = outputDir + std::to_string(i) + ".txt";
         std::ifstream inputPartition = openReadFile(inputFilePath);
@@ -246,7 +269,8 @@ bool verifyIntegrity(const std::string &inputFilePath, const std::string &output
         char *outputData =
             readRecordsFromFile(outputPartition, nRecordsPerRead, &nOutputRecordsLoaded);
 
-        // printf("Number of records loaded: %ld %ld\n", nInputRecordsLoaded, nOutputRecordsLoaded);
+        printf("Number of records loaded for partition %ld: %ld %ld\n", i, nInputRecordsLoaded,
+               nOutputRecordsLoaded);
 
         std::vector<Record *> outputRecordsVec;
         for (uint64_t j = 0; j < nOutputRecordsLoaded; j++) {
@@ -254,23 +278,32 @@ bool verifyIntegrity(const std::string &inputFilePath, const std::string &output
             outputRecordsVec.push_back(record);
         }
 
-        for (uint64_t j = 0; j < nInputRecordsLoaded; j++) {
+        for (uint64_t j = 0; j < nInputRecordsLoaded && integrity; j++) {
             Record *record = new Record(inputData + j * Config::RECORD_SIZE);
             bool found = contains(outputRecordsVec, record);
 
             if (!found) {
-                inputPartition.close();
-                outputPartition.close();
                 printvv("ERROR: Record %ld not found in output partition\n", j);
-                printf("============= Integrity verification failed =============\n");
-                return false;
+                integrity = false;
             }
+            free(record);
         }
 
+        for (uint64_t j = 0; j < nOutputRecordsLoaded; j++) {
+            free(outputRecordsVec[j]);
+        }
+
+        free(outputData);
+        free(inputData);
         inputPartition.close();
         outputPartition.close();
     }
-    printf("SUCCESS: Integrity verified\n");
-    printf("============= Integrity verification successful =============\n");
-    return true;
+    if (integrity) {
+        printf("SUCCESS: Integrity verified\n");
+        printf("============= Integrity verification successful =============\n");
+    } else {
+        printf("ERROR: Integrity verification failed\n");
+        printf("============= Integrity verification failed =============\n");
+    }
+    return integrity;
 }

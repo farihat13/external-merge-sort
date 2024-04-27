@@ -4,6 +4,7 @@
 #include "Record.h"
 #include "config.h"
 #include "defs.h"
+#include <cmath>
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
