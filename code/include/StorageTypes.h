@@ -2,6 +2,7 @@
 #define _STORAGE_TYPES_H_
 
 #include "Losertree.h"
+#include "RunStreamer.h"
 
 
 // ==================================================================

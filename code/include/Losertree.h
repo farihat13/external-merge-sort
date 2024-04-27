@@ -3,6 +3,7 @@
 
 
 #include "Record.h"
+#include "RunStreamer.h"
 #include "Storage.h"
 #include <algorithm>
 #include <cassert>
@@ -25,7 +26,7 @@ class LoserTree {
   public:
     LoserTree() {
         Run *dummyRun = new Run(getMaxRecord(), 1);
-        dummy = new RunStreamer(dummyRun);
+        dummy = new RunStreamer(StreamerType::INMEMORY_RUN, dummyRun);
         // set the current time reabable format as name
         std::time_t ct = std::time(0);
         name = std::string(ctime(&ct));
@@ -58,7 +59,7 @@ class LoserTree {
     void constructTree(std::vector<Run> &inputs) {
         std::vector<RunStreamer *> runStreamers;
         for (size_t i = 0; i < inputs.size(); i++) {
-            runStreamers.push_back(new RunStreamer(&inputs[i]));
+            runStreamers.push_back(new RunStreamer(StreamerType::INMEMORY_RUN, &inputs[i]));
         }
         constructTree(runStreamers);
     }

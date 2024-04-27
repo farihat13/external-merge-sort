@@ -31,7 +31,12 @@ class Record {
         next = nullptr;
     }
     Record(char *data) : data(data), next(nullptr) {}
-    ~Record() { delete[] data; }
+    ~Record() {
+        if (data != nullptr) {
+            delete[] data;
+            data = nullptr;
+        }
+    }
 
     // default comparison based on first 8 bytes of data
     bool operator<(const Record &other) const {
@@ -72,6 +77,16 @@ class Run {
 
   public:
     Run(Record *head, RowCount size) : runHead(head), size(size) {}
+    ~Run() {
+        // printv("\t\t\t\tRun destroying\n");
+        // flushv();
+        // Record *curr = runHead;
+        // while (curr != nullptr) {
+        //     Record *next = curr->next;
+        //     delete curr;
+        //     curr = next;
+        // }
+    }
 
     // getters
     Record *getHead() { return runHead; }
@@ -189,6 +204,7 @@ class RunReader {
         : filename(filename), filesize(filesize), PAGE_SIZE_IN_RECORDS(pageSizeInRecords),
           _is(filename, std::ios::binary) {
         if (!_is) { throw std::runtime_error("Cannot open file: " + filename); }
+        _is.seekg(0, std::ios::beg);
         printv("\t\t\t\tRunReader opened '%s'\n", filename.c_str());
     }
     ~RunReader() {
@@ -212,7 +228,50 @@ class RunReader {
         printv("\t\t\t\tDEBUG: RunReader DELETED '%s'\n", filename.c_str());
     }
     bool isDeletedFile() { return _isDeleted; }
-    Page *readNextPage();
+    // Page *readNextPage();
+    Record *readNextRecords(RowCount *nRecords) {
+        RowCount nRecordsToRead = *nRecords;
+        RowCount nRecordsReadSoFar = 0;
+        Record *head = new Record();
+        Record *curr = head;
+        while (nRecordsReadSoFar < nRecordsToRead) {
+            /* if EOF reached, break */
+            if (_is.eof()) { break; }
+            /** read one page at a time */
+            ByteCount nBytesToRead = this->PAGE_SIZE_IN_RECORDS * Config::RECORD_SIZE;
+            char *recData = new char[nBytesToRead];
+            _is.read(recData, nBytesToRead);
+            ByteCount nBytesRead = _is.gcount();
+            /* if no bytes read, delete record and break */
+            if (nBytesRead == 0) {
+                delete[] recData;
+                break;
+            }
+            /* if bytes read is not equal to record size, throw error */
+            if (nBytesRead % Config::RECORD_SIZE != 0) {
+                std::string errorMsg = "ERROR: Read " + std::to_string(nBytesRead) +
+                                       " bytes, which is not aligned with record size " +
+                                       std::to_string(Config::RECORD_SIZE);
+                printv("%s\n", errorMsg.c_str());
+                throw std::runtime_error(errorMsg);
+            }
+            /** add records to linked list */
+            for (RowCount i = 0; i < nBytesRead / Config::RECORD_SIZE; i++) {
+                Record *rec = new Record(recData + i * Config::RECORD_SIZE);
+                curr->next = rec;
+                curr = rec;
+                nRecordsReadSoFar++;
+            }
+        }
+        /** return the head of the linked list */
+        curr->next = nullptr;          // mark the end of the linked list
+        *nRecords = nRecordsReadSoFar; // update the number of records read
+        curr = head->next;             // skip the dummy head
+        delete head;                   // delete the dummy head
+        return curr;                   // return the head of the linked list
+    }
+
+
     // std::vector<Page *> readNextPages(int nPages);
 
     // getters

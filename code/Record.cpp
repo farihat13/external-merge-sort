@@ -140,18 +140,18 @@ bool Page::isValid() const {
 // =========================================================
 
 
-Page *RunReader::readNextPage() {
-    Page *page = new Page(PAGE_SIZE_IN_RECORDS);
-    // 1. read a page
-    RowCount nRecords = page->read(_is);
-    if (nRecords == 0) { return nullptr; }
-    // 2. if page is not valid, throw error
-    if (!page->isValid()) { throw std::runtime_error("Error: Page is not valid"); }
-    // 3. check if all records are sorted
-    if (!page->isSorted()) { throw std::runtime_error("Error: Page is not sorted"); }
-    _nRecordsRead += nRecords;
-    return page;
-}
+// Page *RunReader::readNextPage() {
+//     Page *page = new Page(PAGE_SIZE_IN_RECORDS);
+//     // 1. read a page
+//     RowCount nRecords = page->read(_is);
+//     if (nRecords == 0) { return nullptr; }
+//     // 2. if page is not valid, throw error
+//     if (!page->isValid()) { throw std::runtime_error("Error: Page is not valid"); }
+//     // 3. check if all records are sorted
+//     if (!page->isSorted()) { throw std::runtime_error("Error: Page is not sorted"); }
+//     _nRecordsRead += nRecords;
+//     return page;
+// }
 
 
 // =========================================================

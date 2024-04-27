@@ -98,12 +98,13 @@ std::pair<std::vector<RunStreamer *>, RowCount> HDD::loadRunfilesToDRAM(size_t f
                runFilename.c_str(), runSize);
         // create a run reader and streamer; the streamer will update the dram input buffer size
         RunReader *reader = new RunReader(runFilename, runSize, _ssdPageSize);
-        RunStreamer *runStreamer = new RunStreamer(reader, _ssd, _dram, readAheadDRAM);
+        RunStreamer *runStreamer =
+            new RunStreamer(StreamerType::READER, reader, _ssd, _dram, readAheadDRAM);
         runStreamers.push_back(runStreamer);
     }
-    printv("\t\t\tDEBUG: After loading SSDRunfiles in mergeHDDRuns: \n%s\n",
+    printv("\t\t\tFOCUS: After loading SSDRunfiles in mergeHDDRuns: \n%s\n",
            _dram->reprUsageDetails().c_str());
-    printv("%s", _ssd->reprUsageDetails().c_str());
+    printv("%s\n", _ssd->reprUsageDetails().c_str());
     flushv();
 
     /**
@@ -120,16 +121,43 @@ std::pair<std::vector<RunStreamer *>, RowCount> HDD::loadRunfilesToDRAM(size_t f
             // create a run reader and streamer; the run streamer will update the dram input buffer
             // size
             RunReader *reader = new RunReader(runFilename, runSize, _hddPageSize);
-            RunStreamer *rsInner = new RunStreamer(reader, _hdd, _ssd, readAheadSSD);
-            RunStreamer *rsOuter = new RunStreamer(rsInner, _ssd, _dram, readAheadDRAM);
+            RunStreamer *rsInner =
+                new RunStreamer(StreamerType::READER, reader, _hdd, _ssd, readAheadSSD);
+            RunStreamer *rsOuter =
+                new RunStreamer(StreamerType::STREAMER, rsInner, _ssd, _dram, readAheadDRAM);
             runStreamers.push_back(rsOuter);
+
+            // ------------------------- TODO: remove this
+            printv("\t\t\tFOCUS: After loading HDDRunfiles in mergeHDDRuns: %s\n",
+                   _dram->reprUsageDetails().c_str());
+            printv("%s\n", _ssd->reprUsageDetails().c_str());
+            printv("%s\n", _hdd->reprUsageDetails().c_str());
+            flushv();
+            RowCount nRecords = 0;
+            Record *rec = rsOuter->getCurrRecord();
+            while (rec != nullptr) {
+                nRecords++;
+                if (nRecords > runSize) {
+                    printvv("ERROR: Loaded more records %lld than runSize %lld\n", nRecords,
+                            runSize);
+                    throw std::runtime_error("Loaded more records than runSize");
+                }
+                printv("\t\t\t\t[%d]: %s\n", nRecords, rec->reprKey());
+                rec = rsOuter->moveNext();
+            }
+            printv("\t\t\t\tLoaded %lld records from %s\n", nRecords, runFilename.c_str());
+            exit(0); // TODO: remove this
+            // -------------------------
         }
-        printv("\t\t\tDEBUG: After loading HDDRunfiles in mergeHDDRuns: %s\n",
+        printv("\t\t\tFOCUS: After loading HDDRunfiles in mergeHDDRuns: %s\n",
                _dram->reprUsageDetails().c_str());
+        printv("%s\n", _ssd->reprUsageDetails().c_str());
         printv("%s\n", _hdd->reprUsageDetails().c_str());
         flushv();
     }
     printv("\t\t\tAllRunTotal: %lld\n", allRunTotal);
+
+    exit(0); // TODO: remove this
 
     return std::make_pair(runStreamers, allRunTotal);
 }
@@ -383,7 +411,8 @@ void SSD::mergeSSDRuns(HDD *outputDevice) {
         // create a run reader and streamer
         RunReader *reader = new RunReader(runFilename, runSize, ssdPageSize);
         // the run streamer will update the dram input buffer size
-        RunStreamer *runStreamer = new RunStreamer(reader, _ssd, _dram, readAhead);
+        RunStreamer *runStreamer =
+            new RunStreamer(StreamerType::READER, reader, _ssd, _dram, readAhead);
         runStreamers.push_back(runStreamer);
     }
     printv("\t\t\tDEBUG: After loading runs to streamers in mergeSSDRuns: %s\n",
@@ -661,6 +690,7 @@ void DRAM::genMiniRuns(RowCount nRecords) {
     }
     printv("\t\t\tDEBUG: Sorted %lld records and generated %d runs in DRAM\n", nRecords,
            _miniruns.size());
+    flushv();
 }
 
 void DRAM::mergeMiniRuns(HDD *outputStorage) {
@@ -734,6 +764,7 @@ void DRAM::mergeMiniRuns(HDD *outputStorage) {
     } else {
         printv("\t\t\tDEBUG: All miniruns fit in DRAM\n");
     }
+    flushv();
 
     /**
      * 3. remaining runs fit in DRAM, merge them

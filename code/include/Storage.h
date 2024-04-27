@@ -3,9 +3,9 @@
 
 
 #include "Record.h"
-#include "Storage.h"
 #include "config.h"
 #include "defs.h"
+#include <cstddef>
 #include <cstdio>
 #include <cstring>
 #include <dirent.h>
@@ -214,6 +214,10 @@ class Storage {
     void addRunFile(std::string filename, RowCount nRecords) {
         runManager->addRunFile(filename, nRecords);
     }
+    std::string getBaseDir() {
+        if (runManager == nullptr) { return ""; }
+        return runManager->getBaseDir();
+    }
     // ---- spill session ----
     void spill(RunWriter *writer);
     RunWriter *startSpillSession();
@@ -228,79 +232,6 @@ class Storage {
     void printStoredRunFiles();
 
 }; // class Storage
-
-
-// =========================================================
-// ----------------------- RunStreamer ---------------------
-// =========================================================
-
-
-/**
- * @brief RunStreamer is a class to stream records from a run
- * It can be used to stream records from a run in memory or from a file
- * If the run is in memory, it will stream records from the run
- * If the run is on disk, it will stream records from the file
- */
-class RunStreamer {
-  private:
-    /** NOTE: must update currentRecord in moveNext */
-    Record *currentRecord;
-    // if reader is not null, it will stream records from file
-    // otherwise, it will stream records until currentRecord->next is null
-    RunReader *reader = nullptr;
-    // if the input is a runstreamer;
-    RunStreamer *streamer = nullptr;
-    Storage *fromDevice = nullptr;
-    Storage *toDevice = nullptr;
-    Page *currentPage = nullptr;
-    PageCount readAhead = 1;
-    // read ahead pages
-    RowCount readAheadPages(int nPages);
-
-    Record *moveNextForRun();
-    Record *moveNextForReader();
-    Record *moveNextForStreamer();
-
-  public:
-    RunStreamer(Run *run);
-    RunStreamer(RunReader *reader, Storage *fromDevice, Storage *toDevice, PageCount readAhead = 1);
-    RunStreamer(RunStreamer *streamer, Storage *fromDevice, Storage *toDevice,
-                PageCount readAhead = 1);
-
-    // getters
-    Record *getCurrRecord() { return currentRecord; }
-    Record *moveNext();
-    std::string getName() {
-        std::string name = "RS:";
-        if (reader != nullptr) {
-            name += " reader: " + reader->getFilename();
-        } else if (streamer != nullptr) {
-            name += " streamer: " + streamer->getName();
-        } else {
-            name += " InMemory";
-        }
-        return name;
-    }
-
-    std::string getFilename() {
-        if (reader != nullptr) {
-            return reader->getFilename();
-        } else if (streamer != nullptr) {
-            return streamer->getFilename();
-        }
-        return "InMemory";
-    }
-
-    // default comparison based on first 8 bytes of data
-    bool operator<(const RunStreamer &other) const { return *currentRecord < *other.currentRecord; }
-    bool operator>(const RunStreamer &other) const { return *currentRecord > *other.currentRecord; }
-    // equality comparison based on all bytes of data
-    bool operator==(const RunStreamer &other) const {
-        return *currentRecord == *other.currentRecord;
-    }
-
-    char *repr() { return currentRecord->reprKey(); }
-}; // class RunStreamer
 
 
 #endif // _STORAGE_H_
