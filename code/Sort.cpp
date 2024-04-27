@@ -120,11 +120,31 @@ void SortIterator::firstPass() {
         _dram->mergeMiniRuns(_ssd);   // this should spill runs to SSD and reset dram
     }
     _hdd->closeRead(); // close the input file
-
     _ssd->mergeSSDRuns(_hdd);
 
+#if defined(_VALIDATE)
+    // verify the input size and consumed records is same
+    printvv("VALIDATE: input size %llu == consumed %llu\n", Config::NUM_RECORDS, _consumed);
+    flushv();
+    assert(_consumed == Config::NUM_RECORDS && "consumed records mismatch");
+#endif
+} // SortIterator::firstPass
 
-    // 4. Merge all runs from SSD to HDD
+
+void SortIterator::externalMergeSort() {
+    TRACE(true);
+
+    _hddCapacity = _hdd->getCapacityInRecords();
+    _hddPageSize = _hdd->getPageSizeInRecords();
+    _ssdCapacity = _ssd->getCapacityInRecords();
+    _ssdPageSize = _ssd->getPageSizeInRecords();
+    _dramCapacity = _dram->getCapacityInRecords();
+    _dramPageSize = _dram->getPageSizeInRecords();
+
+    // TODO:
+    // 1. Create initial sorted runs
+    this->firstPass();
+    // 2. Merge all runs from SSD to HDD
     int mergeIteration = 0;
     while (true) {
         int nRFilesInSSD = _ssd->getRunfilesCount();
@@ -142,7 +162,11 @@ void SortIterator::firstPass() {
                 break;
             } else if (nRFilesInSSD == 1) {
                 printvv("SUCCESS: all runs merged\n");
-                // TODO: copy the last run to HDD and rename
+                // rename the runfile to output file
+                std::string src = _ssd->getRunfile(0);
+                std::string dest = Config::OUTPUT_FILE;
+                rename(src.c_str(), dest.c_str());
+
                 break;
             } // else: merge runs in SSD
             _ssd->mergeSSDRuns(_hdd);
@@ -150,39 +174,17 @@ void SortIterator::firstPass() {
             if (nRFilesInHDD == 1 && nRFilesInSSD == 0) {
                 /** all runs merged, because there is only one run in HDD, and no runs in SSD */
                 printvv("SUCCESS: all runs merged\n");
-                // TODO: copy the last run to HDD and rename
+                // rename the runfile to output file
+                std::string src = _hdd->getRunfile(0);
+                std::string dest = Config::OUTPUT_FILE;
+                rename(src.c_str(), dest.c_str());
+
                 break;
             } else {
                 _hdd->mergeHDDRuns();
             }
         }
         ++mergeIteration;
-        // break; // TODO: remove this
     }
-
-#if defined(_VALIDATE)
-    // verify the input size and consumed records is same
-    printvv("VALIDATE: input size %llu == consumed %llu\n", Config::NUM_RECORDS, _consumed);
-    flushv();
-    assert(_consumed == Config::NUM_RECORDS && "consumed records mismatch");
-#endif
-}
-
-
-void SortIterator::externalMergeSort() {
-    TRACE(true);
-
-    _hddCapacity = _hdd->getCapacityInRecords();
-    _hddPageSize = _hdd->getPageSizeInRecords();
-    _ssdCapacity = _ssd->getCapacityInRecords();
-    _ssdPageSize = _ssd->getPageSizeInRecords();
-    _dramCapacity = _dram->getCapacityInRecords();
-    _dramPageSize = _dram->getPageSizeInRecords();
-
-    // TODO:
-    // 1. Create initial sorted runs
-
-    this->firstPass();
-    // 2. Store runs on disk
-    // 3. Initialize merge process
+    printvv("INFO: all runs merged\n");
 } // SortIterator::externalMergeSort

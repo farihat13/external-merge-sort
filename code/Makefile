@@ -1,5 +1,5 @@
 # compiler options
-CPPOPT=-g -Og -D_DEBUG -D_VALIDATE -D_SMALL #-D_USE_LOGFILE #-D_DUP_CHECK #-DUP_GEN
+CPPOPT=-g -Og -D_DEBUG -D_VALIDATE #-D_SMALL #-D_USE_LOGFILE #-D_DUP_CHECK #-DUP_GEN
 # -O2 -Os -Ofast
 # -fprofile-generate -fprofile-use
 # -fsanitize=address -fsanitize=leak -fsanitize=undefined

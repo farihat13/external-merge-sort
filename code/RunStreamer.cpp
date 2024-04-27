@@ -68,11 +68,10 @@ Record *RunStreamer::moveNextForRun() {
  * Runstreamer for a runreader
  */
 RunStreamer::RunStreamer(StreamerType type, RunReader *reader, Storage *fromDevice,
-                         Storage *toDevice, PageCount readAhead)
-    : type(type), reader(reader), fromDevice(fromDevice), toDevice(toDevice), readAhead(readAhead) {
-
-    TRACE(true);
-
+                         Storage *toDevice, PageCount readAhead, bool inputCluster)
+    : type(type), reader(reader), fromDevice(fromDevice), toDevice(toDevice), readAhead(readAhead),
+      inputCluster(inputCluster) {
+    // TRACE(true);
     assert(type == StreamerType::READER); // validate
     if (readAhead < 1) {                  // validate
         throw std::runtime_error("Error: ReadAhead should be at least 1");
@@ -103,6 +102,7 @@ RunStreamer::RunStreamer(StreamerType type, RunReader *reader, Storage *fromDevi
 
 
 RowCount RunStreamer::readAheadPages(PageCount nPages) {
+    if (reader == nullptr) { return 0; }
     // TRACE(true);
     /**
      * 1. read `nPages` pages from the reader
@@ -118,9 +118,20 @@ RowCount RunStreamer::readAheadPages(PageCount nPages) {
          * end of the file. So, close the reader and delete the file
          */
         if (!reader->isDeletedFile()) {
-            fromDevice->freeSpace(reader->getFilesize());
+            printv("\t\t\t\tFreeingSpace for %lld records and deleting %s from %s\n",
+                   reader->getFilesize(), reader->getFilename().c_str(),
+                   fromDevice->getName().c_str());
+            if (fromDevice->getName() != DISK_NAME) {
+                if (inputCluster) { // free space in input cluster
+                    fromDevice->freeInputCluster(reader->getFilesize());
+                } else { // free general space
+                    fromDevice->freeSpace(reader->getFilesize());
+                }
+            }
             reader->close();
             reader->deleteFile();
+            // delete reader;
+            // reader = nullptr;
         }
     }
     // if (run != nullptr) { // free memory
@@ -130,7 +141,15 @@ RowCount RunStreamer::readAheadPages(PageCount nPages) {
     /**
      * 2. create a run from the records read, and store in memory `run` variable
      */
-    run = new Run(runHead, nRecordsRead);
+    if (nRecordsRead > 0) {
+        run = new Run(runHead, nRecordsRead);
+        // if (nRecordsRead >= 2) {
+        //     printv("\t\t\t\tFirst record: %s\n", run->getHead()->reprKey());
+        //     printv("\t\t\t\tSecond record: %s\n", run->getHead()->next->reprKey());
+        // }
+    }
+    printv("\t\t\t\tRead %lld records from reader %s, expected to read %lld records\n",
+           nRecordsRead, reader->getFilename().c_str(), nRecordsToRead);
     return nRecordsRead;
 }
 
@@ -175,11 +194,12 @@ RunStreamer::RunStreamer(StreamerType type, RunStreamer *streamer, Storage *from
                          Storage *toDevice, PageCount readAhead)
     : type(type), readStreamer(streamer), fromDevice(fromDevice), toDevice(toDevice),
       readAhead(readAhead) {
-    TRACE(true);
+    // TRACE(true);
     assert(type == StreamerType::STREAMER); // validate
     if (readAhead < 1) {                    // validate
         throw std::runtime_error("Error: ReadAhead should be at least 1");
     }
+    inputCluster = true;
 
     /**
      * 1. intialize the inputbuffer filename where the streamer data is stored
@@ -187,11 +207,23 @@ RunStreamer::RunStreamer(StreamerType type, RunStreamer *streamer, Storage *from
     std::string fname = streamer->getFilename();
     fname = fname.substr(fname.find_last_of("/") + 1);
     writerFilename = fromDevice->getBaseDir() + "/buf_" + fname;
+    // // ----------------- debug -----------------
+    // RowCount count = 0;
+    // RowCount nRecords = 19000;
+    // while (true) {
+    //     Record *rec = readStreamer->getCurrRecord();
+    //     if (rec == nullptr) { break; }
+    //     count++;
+    //     printv("\t\t\t\t\t\t(%d) %s\n", count, rec->reprKey());
+    //     if (count < nRecords - 1) { Record *r = readStreamer->moveNext(); }
+    // }
+    // exit(0);
+    // // ----------------- debug -----------------
     /**
      * 2. store `nInBufRecords` Records in a buffer file in `fromDevice`
      */
     RowCount nInBufRecords = streamer->getReadAheadInRecords();
-    RowCount nRecordsBuffered = readStream(nInBufRecords);
+    RowCount nRecordsBuffered = readStream(nInBufRecords, true);
     if (nRecordsBuffered == 0) { // validate
         throw std::runtime_error("ERROR: RunStreamer initialized with empty run");
     }
@@ -221,53 +253,61 @@ RunStreamer::RunStreamer(StreamerType type, RunStreamer *streamer, Storage *from
 }
 
 
-RowCount RunStreamer::readStream(RowCount nRecords) {
+RowCount RunStreamer::readStream(RowCount nRecords, bool firstTime) {
+    // TRACE(true);
     /**
      * 1. read nRecords from the streamer and create a run (linked list of records)
      */
+    if (!firstTime) readStreamer->moveNext(); // skip the current record
     Record *head = new Record();
     Record *curr = head;
     RowCount count = 0;
     while (count < nRecords) {
         Record *rec = readStreamer->getCurrRecord();
         if (rec == nullptr) { break; }
-        if (count == 0) printv("\t\t\tFirst record: %s\n", rec->reprKey());
-        if (count == 1) printv("\t\t\tSecond record: %s\n", rec->reprKey());
+        // if (count == 0) printv("\t\t\tFirst record: %s\n", rec->reprKey());
+        // if (count == 1) printv("\t\t\tSecond record: %s\n", rec->reprKey());
         count++;
         curr->next = rec;
         curr = rec;
-        if (count < nRecords - 1) { Record *r = readStreamer->moveNext(); }
+        if (count < nRecords) { Record *r = readStreamer->moveNext(); }
     }
-    printv("\t\t\t\tRead %lld records\n", count);
-    printv("\t\t\t\tCreated runwriter %s from streamer filename %s\n", writerFilename.c_str(),
-           readStreamer->getName().c_str());
-    flushv();
-    Run run = Run(head->next, count);
+    // printv("\t\t\t\tRead %lld records\n", count);
+    // flushv();
 
-    /**
-     * 2. write the run to a file in `fromDevice`
-     */
-    RunWriter writer(writerFilename); // this opens the file in truncate mode
-    writer.writeNextRun(run);
-    writer.close();
-    // // free memory
-    // delete head;
-    // // delete run; // the ~Run() will delete the records
-    /**
-     * 3. update the input cluster space of the `fromDevice`
-     */
-    fromDevice->fillInputCluster(count);
-    // print access time
-    printv("\t\t\t\tSTATE -> Wrote %lld records to %s using RS\n", count, writerFilename.c_str());
-    printv("\t\t\t\tACCESS -> A write to %s was made with size %llu bytes and latency %d ms\n",
-           fromDevice->getName().c_str(), count * Config::RECORD_SIZE,
-           fromDevice->getAccessTimeInMillis(count));
-    flushv();
+    if (count > 0) {
+        Run run = Run(head->next, count);
+        /**
+         * 2. write the run to a file in `fromDevice`
+         */
+        RunWriter writer(writerFilename); // this opens the file in truncate mode
+        writer.writeNextRun(run);
+        writer.close();
+        printv("\t\t\t\tCreated runwriter %s from streamer filename %s (%lld records)\n",
+               writerFilename.c_str(), readStreamer->getName().c_str(), count);
+        // // free memory
+        // delete head;
+        // // delete run; // the ~Run() will delete the records
+        /**
+         * 3. update the input cluster space of the `fromDevice`
+         */
+        if (fromDevice->getName() != DISK_NAME) { fromDevice->fillInputCluster(count); }
+        printv("\t\t\t\tFillingSpace for %lld records in %s\n", count,
+               fromDevice->getName().c_str());
+        // print access time
+        printv("\t\t\t\tSTATE -> Wrote %lld records to %s using RS\n", count,
+               writerFilename.c_str());
+        printv("\t\t\t\tACCESS -> A write to %s was made with size %llu bytes and latency %d ms\n",
+               fromDevice->getName().c_str(), count * Config::RECORD_SIZE,
+               fromDevice->getAccessTimeInMillis(count));
+        flushv();
+    }
     // return the number of records written
     return count;
 }
 
 Record *RunStreamer::moveNextForStreamer() {
+    // TRACE(true);
     moveNextForReader();
     if (currentRecord == nullptr) {
         /**
@@ -275,8 +315,8 @@ Record *RunStreamer::moveNextForStreamer() {
          * 1. read stream and update the buffer file
          */
         RowCount nInBufRecords = readStreamer->getReadAheadInRecords();
-        printv("\t\t\t\tBuffered %lld records from %s has been exhausted\n", nInBufRecords,
-               readStreamer->getName().c_str());
+        printv("\t\t\t\tDEBUG: Buffered %lld records in %s has been exhausted\n", nInBufRecords,
+               writerFilename.c_str());
         RowCount nRecordsBuffered = readStream(nInBufRecords);
         if (nRecordsBuffered == 0) {
             currentRecord = nullptr;

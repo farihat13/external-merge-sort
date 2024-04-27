@@ -166,15 +166,39 @@ class Storage {
         _filled += nRecords;
     }
     void freeSpace(RowCount nRecords) {
-        if (_filled - nRecords < 0) {
-            throw std::runtime_error("ERROR: freeing more records than filled in " + this->name);
+        if (nRecords > _filled) {
+            std::string msg = "ERROR: freeing " + std::to_string(nRecords) +
+                              " records than filled in " + std::to_string(_filled) + " in " +
+                              this->name;
+            throw std::runtime_error(msg);
         }
         _filled -= nRecords;
     }
-    void fillInputCluster(RowCount nRecords) { _filledInputClusters += nRecords; }
-    void fillOutputCluster(RowCount nRecords) { _filledOutputClusters += nRecords; }
-    void freeInputCluster(RowCount nRecords) { _filledInputClusters -= nRecords; }
-    void freeOutputCluster(RowCount nRecords) { _filledOutputClusters -= nRecords; }
+    void fillInputCluster(RowCount nRecords) {
+        if (_filledInputClusters + nRecords > _totalSpaceInInputClusters) {
+            throw std::runtime_error("ERROR: filling more records than capacity in input clusters");
+        }
+        _filledInputClusters += nRecords;
+    }
+    void fillOutputCluster(RowCount nRecords) {
+        if (_filledOutputClusters + nRecords > _totalSpaceInOutputClusters) {
+            throw std::runtime_error(
+                "ERROR: filling more records than capacity in output clusters");
+        }
+        _filledOutputClusters += nRecords;
+    }
+    void freeInputCluster(RowCount nRecords) {
+        if (nRecords > _filledInputClusters) {
+            throw std::runtime_error("ERROR: freeing more records than filled in input clusters");
+        }
+        _filledInputClusters -= nRecords;
+    }
+    void freeOutputCluster(RowCount nRecords) {
+        if (nRecords > _filledOutputClusters) {
+            throw std::runtime_error("ERROR: freeing more records than filled in output clusters");
+        }
+        _filledOutputClusters -= nRecords;
+    }
     void resetAllFilledSpace() {
         _filled = 0;
         _filledInputClusters = 0;
@@ -225,6 +249,10 @@ class Storage {
     int getRunfilesCount() {
         if (runManager == nullptr) { return 0; }
         return runManager->getStoredRunsSortedBySize().size();
+    }
+    std::string getRunfile(int index) {
+        if (runManager == nullptr) { return ""; }
+        return runManager->getStoredRunsSortedBySize()[index].first;
     }
 
     // ---------------------------- printing -----------------------------------

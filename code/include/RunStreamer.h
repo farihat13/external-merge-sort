@@ -47,11 +47,12 @@ class RunStreamer {
     // ---- for reader and streamer ----
     RunReader *reader = nullptr;
     PageCount readAhead;
+    bool inputCluster = false;
     RowCount readAheadPages(PageCount nPages);
     // ---- for streamer ----
     RunStreamer *readStreamer = nullptr;
     std::string writerFilename = "";
-    RowCount readStream(RowCount nRecords);
+    RowCount readStream(RowCount nRecords, bool firstTime = false);
     Record *moveNextForStreamer();
 
   public:
@@ -59,7 +60,7 @@ class RunStreamer {
     RunStreamer(StreamerType type, Run *run);
     // ---- for reader ----
     RunStreamer(StreamerType type, RunReader *reader, Storage *fromDevice, Storage *toDevice,
-                PageCount readAhead);
+                PageCount readAhead, bool inputCluster = false);
     // ---- for streamer ----
     RunStreamer(StreamerType type, RunStreamer *streamer, Storage *fromDevice, Storage *toDevice,
                 PageCount readAhead);
@@ -87,9 +88,11 @@ class RunStreamer {
     }
 
     std::string getFilename() {
-        if (reader != nullptr) {
+        if (type == StreamerType::INMEMORY_RUN) {
+            return "InMemory";
+        } else if (type == StreamerType::READER) {
             return reader->getFilename();
-        } else if (readStreamer != nullptr) {
+        } else if (type == StreamerType::STREAMER) {
             return readStreamer->getFilename();
         }
         return "InMemory";
