@@ -32,6 +32,7 @@ RowCount Config::NUM_RECORDS = 20LL; // 20 records
 // ---- Verify ----
 std::string Config::VERIFY_INPUTDIR = "Verify_parts/input/";
 std::string Config::VERIFY_OUTPUTDIR = "Verify_parts/output/";
+int Config::VERIFY_HASH_BYTES = sizeof(uint64_t);
 // ---- File ----
 std::string Config::OUTPUT_FILE = "output.txt";
 std::string Config::INPUT_FILE = "input.txt";
@@ -124,7 +125,8 @@ ByteCount getInputSizeInGB() { return getInputSizeInBytes() / (1024 * 1024 * 102
 
 std::string formatNum(uint64_t number) {
     bool isNegative = number < 0;
-    if (isNegative) number = -number;
+    if (isNegative)
+        number = -number;
 
     std::string suffix = "";
     double displayNumber = number;
@@ -150,7 +152,9 @@ std::string formatNum(uint64_t number) {
             result.pop_back();
         }
         // If the last character is the dot, remove it
-        if (result.back() == '.') { result.pop_back(); }
+        if (result.back() == '.') {
+            result.pop_back();
+        }
     }
 
     return (isNegative ? "-" : "") + result + suffix;
@@ -188,7 +192,8 @@ void Logger::writef(const char *format, ...) {
 
 void Assert(bool const predicate, char const *const file, int const line,
             char const *const function) {
-    if (predicate) return;
+    if (predicate)
+        return;
 
     fflush(stdout);
     fprintf(stderr, "failed assertion at %s:%d:%s\n", file, line, function);
@@ -210,13 +215,17 @@ void printVerbose(bool vv, char const *const file, int const line, char const *c
     va_start(args, format);
 
 #if defined(_USE_LOGFILE)
-    if (!logFile.is_open()) { logFile.open("log.txt"); }
-    if (vv) logFile << file << ":" << line << ":" << function << " ";
+    if (!logFile.is_open()) {
+        logFile.open("log.txt");
+    }
+    if (vv)
+        logFile << file << ":" << line << ":" << function << " ";
     char buffer[1024];
     vsnprintf(buffer, sizeof(buffer), format, args);
     logFile << buffer;
 #else
-    if (vv) std::printf("%s:%d:%s\t", file, line, function);
+    if (vv)
+        std::printf("%s:%d:%s\t", file, line, function);
     std::vprintf(format, args);
 #endif
 
@@ -226,7 +235,8 @@ void printVerbose(bool vv, char const *const file, int const line, char const *c
 
 void flushVerbose() {
 #if defined(_USE_LOGFILE)
-    if (logFile.is_open()) logFile.flush();
+    if (logFile.is_open())
+        logFile.flush();
 #else
     std::fflush(stdout);
 #endif

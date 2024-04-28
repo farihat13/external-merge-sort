@@ -9,6 +9,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <set>
 #include <string>
 #include <sys/stat.h>
 #include <vector>

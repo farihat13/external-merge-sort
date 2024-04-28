@@ -110,27 +110,27 @@ int main(int argc, char *argv[]) {
     // read command line arguments
     readCmdlineArgs(argc, argv);
 
-    // initialize anything needed
-    init();
+    // // initialize anything needed
+    // init();
 
-    // TRACE(true);
+    // // TRACE(true);
 
-    // Plan *const plan = new SortPlan(new ScanPlan(Config::NUM_RECORDS));
-    // new ScanPlan(Config::NUM_RECORDS);
-    // new SortPlan ( new FilterPlan ( new ScanPlan (7) ) );
-    Plan *const plan = new SortPlan(new ScanPlan(Config::NUM_RECORDS, Config::INPUT_FILE));
+    // // Plan *const plan = new SortPlan(new ScanPlan(Config::NUM_RECORDS));
+    // // new ScanPlan(Config::NUM_RECORDS);
+    // // new SortPlan ( new FilterPlan ( new ScanPlan (7) ) );
+    // Plan *const plan = new SortPlan(new ScanPlan(Config::NUM_RECORDS, Config::INPUT_FILE));
 
-    Iterator *const it = plan->init();
-    it->run();
+    // Iterator *const it = plan->init();
+    // it->run();
 
-    delete it;
-    delete plan;
+    // delete it;
+    // delete plan;
 
-    // cleanup what was initialized in init()
-    cleanup();
+    // // cleanup what was initialized in init()
+    // cleanup();
 
 #if defined(_VERIFY)
-    uint64_t capacityMB = 1024;
+    uint64_t capacityMB = 1 * 1024;
     verifyOrder(Config::OUTPUT_FILE, capacityMB);
     verifyIntegrity(Config::INPUT_FILE, Config::OUTPUT_FILE, capacityMB);
     return 0;

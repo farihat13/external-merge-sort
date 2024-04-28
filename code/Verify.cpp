@@ -64,12 +64,17 @@ bool verifyOrder(const std::string &outputFilePath, uint64_t capacityMB) {
     uint64_t capacityBytes = capacityMB * 1024 * 1024;
     RowCount nRecordsPerRead = capacityBytes / Config::RECORD_SIZE;
 
-    // read first record
     RowCount nRecordsLoaded = 0;
-    char *data = readRecordsFromFile(outputFile, nRecordsPerRead, &nRecordsLoaded);
-    Record *prevRecord = new Record(data);
     RowCount nRecords = nRecordsLoaded;
     RowCount i = 1;
+
+    int comparisonLength = Config::RECORD_KEY_SIZE;
+    char *data = readRecordsFromFile(outputFile, nRecordsPerRead, &nRecordsLoaded);
+    char *startData = data;
+
+    // read first record
+    char *prevRecord = new char[comparisonLength];
+    std::memcpy(prevRecord, data, comparisonLength);
 
     printf("Number of records per read: %ld\n", nRecordsLoaded);
     bool ordered = true;
@@ -79,30 +84,34 @@ bool verifyOrder(const std::string &outputFilePath, uint64_t capacityMB) {
 
         // fetch new data if needed
         if (nRecordsLoaded == 0) {
+            free(startData);
             data = readRecordsFromFile(outputFile, nRecordsPerRead, &nRecordsLoaded);
+            startData = data;
             if (data == nullptr || nRecordsLoaded == 0) {
                 printf("Finished reading output\n");
                 break;
             }
             nRecords += nRecordsLoaded;
+        } else {
+            data += Config::RECORD_SIZE;
         }
 
         Record *record = new Record(data);
-        int compare = std::strncmp(prevRecord->data, record->data, Config::RECORD_KEY_SIZE);
+        int compare = std::strncmp(prevRecord, record->data, comparisonLength);
         if (compare > 0) {
             printvv("ERROR: Record %ld is not sorted\n", i);
-            printvv("prev: %s, curr: %s\n", prevRecord->reprKey(), record->reprKey());
+            printvv("prev: %s, curr: %s\n", prevRecord, record->reprKey());
             ordered = false;
         }
 
         i += 1;
-        free(prevRecord);
-        prevRecord = record;
-        data += Config::RECORD_SIZE;
+        std::memcpy(prevRecord, record->data, comparisonLength);
     }
 
     // cleanup
-    free(data);
+    if (startData != nullptr) {
+        free(startData);
+    }
     outputFile.close();
 
 
@@ -118,16 +127,15 @@ bool verifyOrder(const std::string &outputFilePath, uint64_t capacityMB) {
 }
 
 
-u_int64_t hash(Record *record, u_int64_t nPartitions) {
+u_int64_t simpleHash(Record *record, u_int64_t nPartitions) {
     // record is n bytes, key is 8 bytes and value is n-8 bytes
     // hash using key
-    char *key = record->reprKey();
+    char *key = record->data;
     u_int64_t hash = 0;
-    for (int i = 0; i < 8; i++) {
+    for (int i = 0; i < Config::RECORD_SIZE; i++) {
         hash = (hash << 5) + hash + key[i];
     }
-    delete[] key;
-    return hash % nPartitions;
+    return hash;
 }
 
 
@@ -148,17 +156,23 @@ void partitionFile(const std::string &inputFilePath, const std::string &hashFile
     // read input file in batches and hash partition it
     while (1) {
         data = readRecordsFromFile(inputFile, nRecordsPerRead, &nRecordsLoaded);
-        if (data == nullptr || nRecordsLoaded == 0) { break; }
+        if (data == nullptr || nRecordsLoaded == 0) {
+            break;
+        }
         printf("Number of records loaded: %ld\n", nRecordsLoaded);
 
         for (RowCount i = 0; i < nRecordsLoaded; i++) {
             Record *record = new Record(data + i * Config::RECORD_SIZE);
-            u_int64_t partition = hash(record, nPartitions);
-            outputFiles[partition].write(record->data, Config::RECORD_SIZE);
+            u_int64_t hash = simpleHash(record, nPartitions);
+            uint64_t partition = hash % nPartitions;
+            outputFiles[partition].write(reinterpret_cast<char *>(&hash),
+                                         Config::VERIFY_HASH_BYTES);
             // free(record);
             record->data = nullptr;
         }
-        if (data != nullptr) { free(data); }
+        if (data != nullptr) {
+            free(data);
+        }
         // free(data);
     }
 
@@ -194,15 +208,50 @@ void cleanDirectory(const std::string &dirPath) {
     // remove directory and create again
     std::string command = "rm -rf " + dirPath;
     int code = system(command.c_str());
-    if (code == -1) { printvv("ERROR: Failed to remove directory '%s'\n", dirPath.c_str()); }
+    if (code == -1) {
+        printvv("ERROR: Failed to remove directory '%s'\n", dirPath.c_str());
+    }
     command = "mkdir -p " + dirPath;
     code = system(command.c_str());
-    if (code == -1) { printvv("ERROR: Failed to create directory '%s'\n", dirPath.c_str()); }
+    if (code == -1) {
+        printvv("ERROR: Failed to create directory '%s'\n", dirPath.c_str());
+    }
+}
+
+
+void readHashesFromFileToSet(std::ifstream &file, std::set<uint64_t> &hashes,
+                             uint64_t &nHashesRead) {
+    file.seekg(0, std::ios::end);
+    std::streampos fileSize = file.tellg();
+    file.seekg(0, std::ios::beg);
+    nHashesRead = fileSize / sizeof(uint64_t);
+    for (size_t i = 0; i < nHashesRead; i++) {
+        uint64_t hash;
+        file.read(reinterpret_cast<char *>(&hash), sizeof(uint64_t));
+        hashes.insert(hash);
+    }
+}
+
+void readHashesFromFile(std::ifstream &file, std::vector<uint64_t> &hashes, uint64_t &nHashesRead) {
+    file.seekg(0, std::ios::end);
+    std::streampos fileSize = file.tellg();
+    file.seekg(0, std::ios::beg);
+    nHashesRead = fileSize / sizeof(uint64_t);
+    hashes.resize(nHashesRead);
+
+    if (!file.read(reinterpret_cast<char *>(hashes.data()), nHashesRead * sizeof(uint64_t))) {
+        printvv("ERROR: Failed to read hashes from file\n");
+    }
+
+    // for (size_t i = 0; i < nHashesRead; i++) {
+    //     uint64_t hash;
+    //     file.read(reinterpret_cast<char *>(&hash), sizeof(uint64_t));
+    //     hashes.push_back(hash);
+    // }
 }
 
 bool compareHashFiles(uint64_t i, const std::string &inputDir, const std::string &outputDir,
-                      uint64_t nRecordsPerRead, RowCount &nInputRecordsLoaded,
-                      RowCount &nOutputRecordsLoaded) {
+                      RowCount &nInputRecordsLoaded, RowCount &nOutputRecordsLoaded) {
     std::string inputFilePath = inputDir + std::to_string(i) + ".txt";
     std::string outputFilePath = outputDir + std::to_string(i) + ".txt";
     std::ifstream inputPartition = openReadFile(inputFilePath);
@@ -211,7 +260,9 @@ bool compareHashFiles(uint64_t i, const std::string &inputDir, const std::string
     bool integrity = true;
 
     // check if exists
-    if (!inputPartition.is_open() && !outputPartition.is_open()) { return true; }
+    if (!inputPartition.is_open() && !outputPartition.is_open()) {
+        return true;
+    }
     if (!inputPartition.is_open()) {
         printvv("ERROR: Failed to open input partition file '%s'\n", inputFilePath.c_str());
         outputPartition.close();
@@ -223,36 +274,35 @@ bool compareHashFiles(uint64_t i, const std::string &inputDir, const std::string
         return false;
     }
 
-    char *inputData = readRecordsFromFile(inputPartition, nRecordsPerRead, &nInputRecordsLoaded);
-    char *outputData = readRecordsFromFile(outputPartition, nRecordsPerRead, &nOutputRecordsLoaded);
 
-    printf("Number of records loaded for partition %ld: %ld %ld\n", i, nInputRecordsLoaded,
-           nOutputRecordsLoaded);
+    // std::set<uint64_t> inputHashes;
+    // readHashesFromFileToSet(inputPartition, inputHashes, nInputRecordsLoaded);
+    // std::set<uint64_t> outputHashes;
+    // readHashesFromFileToSet(outputPartition, outputHashes, nOutputRecordsLoaded);
+    // if (inputHashes != outputHashes) {
+    //     printvv("ERROR: Hashes do not match for partition %ld\n", i);
+    //     integrity = false;
+    // }
 
-    std::vector<Record *> outputRecordsVec;
-    for (uint64_t j = 0; j < nOutputRecordsLoaded; j++) {
-        Record *record = new Record(outputData + j * Config::RECORD_SIZE);
-        outputRecordsVec.push_back(record);
-    }
-
-    for (uint64_t j = 0; j < nInputRecordsLoaded && integrity; j++) {
-        Record *record = new Record(inputData + j * Config::RECORD_SIZE);
-        bool found = contains(outputRecordsVec, record);
-
-        if (!found) {
-            printvv("ERROR: Record %ld not found in output partition\n", j);
-            printf("Record: %s\n", record->repr());
+    std::vector<uint64_t> inputHashes;
+    readHashesFromFile(inputPartition, inputHashes, nInputRecordsLoaded);
+    std::vector<uint64_t> outputHashes;
+    readHashesFromFile(outputPartition, outputHashes, nOutputRecordsLoaded);
+    std::sort(inputHashes.begin(), inputHashes.end());
+    printf("Comparing partition %ld: input hashes: %ld, output hashes: %ld\n", i,
+           nInputRecordsLoaded, nOutputRecordsLoaded);
+    assert(nInputRecordsLoaded == inputHashes.size());
+    assert(nOutputRecordsLoaded == outputHashes.size());
+    for (uint64_t j = 0; j < nOutputRecordsLoaded && integrity; j++) {
+        uint64_t hash = outputHashes[j];
+        if (!std::binary_search(inputHashes.begin(), inputHashes.end(), hash)) {
+            printvv("ERROR: Hash %ld not found in input partition\n", hash);
             integrity = false;
         }
-        record->data = nullptr;
     }
 
-    for (uint64_t j = 0; j < nOutputRecordsLoaded; j++) {
-        free(outputRecordsVec[j]);
-    }
-
-    free(outputData);
-    free(inputData);
+    inputHashes.clear();
+    outputHashes.clear();
     inputPartition.close();
     outputPartition.close();
 
@@ -267,26 +317,25 @@ bool verifyIntegrity(const std::string &inputFilePath, const std::string &output
     // delete existing hash partitioned files
     std::string inputDir = Config::VERIFY_INPUTDIR;
     std::string outputDir = Config::VERIFY_OUTPUTDIR;
+
     cleanDirectory(inputDir);
     cleanDirectory(outputDir);
-
 
     std::ifstream inputFile = openReadFile(inputFilePath);
     std::ifstream outputFile = openReadFile(outputFilePath);
 
     uint64_t capacityBytes = capacityMB * 1024 * 1024;
-    uint64_t matchCapacityBytes = capacityBytes / 2;
+    uint64_t expectedPartitionSize = capacityBytes / 2; // expecting to hold two partitions in DRAM
+    uint64_t expectedHashesPerPartition = expectedPartitionSize / Config::VERIFY_HASH_BYTES;
+    uint64_t nPartitions = ceil(Config::NUM_RECORDS * 1.0 / expectedHashesPerPartition);
 
-    // expecting partition of this size matchCapacityBytes
-    // handle skew, reducing partition size to half
-    uint64_t expectedPartitionBytes = matchCapacityBytes / 2;
-    uint64_t expectedRecordsPerPartition = expectedPartitionBytes / Config::RECORD_SIZE;
-    uint64_t nPartitions = ceil(Config::NUM_RECORDS * 1.0 / expectedRecordsPerPartition);
+    printf("Expected partition size: %ld\n", expectedPartitionSize);
+    printf("Expected hashes per partition: %ld\n", expectedHashesPerPartition);
 
     printf("Number of partitions: %ld\n", nPartitions);
 
     // read input file in batches and hash partition it
-    uint64_t nRecordsPerRead = matchCapacityBytes / Config::RECORD_SIZE;
+    uint64_t nRecordsPerRead = capacityBytes / Config::RECORD_SIZE;
     partitionFile(inputFilePath, inputDir, nPartitions, nRecordsPerRead);
     printf("Partitioned input file\n");
     partitionFile(outputFilePath, outputDir, nPartitions, nRecordsPerRead);
@@ -296,10 +345,11 @@ bool verifyIntegrity(const std::string &inputFilePath, const std::string &output
     printf("Comparing hash partitioned files\n");
     RowCount totalInputRecords = 0, totalOutputRecords = 0;
     bool integrity = true;
+
     for (u_int64_t i = 0; i < nPartitions && integrity; i++) {
         RowCount nInputRecordsLoaded = 0, nOutputRecordsLoaded = 0;
-        integrity = compareHashFiles(i, inputDir, outputDir, nRecordsPerRead, nInputRecordsLoaded,
-                                     nOutputRecordsLoaded);
+        integrity =
+            compareHashFiles(i, inputDir, outputDir, nInputRecordsLoaded, nOutputRecordsLoaded);
         totalInputRecords += nInputRecordsLoaded;
         totalOutputRecords += nOutputRecordsLoaded;
     }

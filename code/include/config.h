@@ -61,6 +61,7 @@ class Config {
     // ---- VERIFY ----
     static std::string VERIFY_INPUTDIR;
     static std::string VERIFY_OUTPUTDIR;
+    static int VERIFY_HASH_BYTES;
     // ---- File ----
     static std::string OUTPUT_FILE;
     static std::string INPUT_FILE;
@@ -85,7 +86,8 @@ class Logger {
   private:
     std::ofstream traceFile;
     Logger() {
-        if (!traceFile.is_open()) traceFile.open(Config::TRACE_FILE);
+        if (!traceFile.is_open())
+            traceFile.open(Config::TRACE_FILE);
     }
 
   public:
