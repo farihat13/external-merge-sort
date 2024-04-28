@@ -10,27 +10,27 @@ if [ -z "$PID" ]; then
 fi
 
 # Output file for memory usage data
-OUTPUT_FILE="memory_usage.txt"
+OUTPUT_FILE="memcpu_10G.txt"
 
 # Header for output file
-echo "Timestamp, RSS, VSZ" > $OUTPUT_FILE
+echo "Timestamp, RSS (KB), VSZ (KB), CPU (%)" > $OUTPUT_FILE
 
-# Loop to collect memory usage at intervals
+# Loop to collect memory and CPU usage at intervals
 while true; do
     if ! ps -p $PID > /dev/null; then
         echo "Process ended."
         break
     fi
 
-    # Extract RSS and VSZ values (memory usage metrics)
-    MEM_USAGE=$(ps -p $PID -o rss=,vsz= | awk '{print $1","$2}')
+    # Extract RSS, VSZ, and CPU usage values
+    USAGE_DATA=$(ps -p $PID -o rss=,vsz=,pcpu= | awk '{print $1","$2","$3}')
 
     # Get current timestamp
     TIMESTAMP=$(date +"%Y-%m-%d %H:%M:%S")
 
     # Append data to the file
-    echo "$TIMESTAMP, $MEM_USAGE" >> $OUTPUT_FILE
+    echo "$TIMESTAMP, $USAGE_DATA" >> $OUTPUT_FILE
 
     # Wait for 1 second (or more depending on how often you want to record)
-    sleep 1i
+    sleep 1
 done

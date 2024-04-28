@@ -85,7 +85,6 @@ void SortIterator::firstPass() {
         RowCount nRecordsLeft = Config::NUM_RECORDS - _consumed;
         RowCount _ssdCurrSize = _ssd->getTotalFilledSpaceInRecords();
         RowCount nRecordsNext = std::min(nRecordsLeft, _dramCapacity);
-        // if (_ssdCurrSize + nRecordsNext > _ssdCapacity) { // TODO:
         if (_ssdCurrSize + nRecordsNext > _ssd->getMergeFanInRecords()) {
             // spill some runs to HDD
             _ssd->mergeSSDRuns(_hdd);
@@ -112,7 +111,8 @@ void SortIterator::firstPass() {
         _dram->genMiniRuns(nRecords, _ssd);
     }
     _hdd->closeRead(); // close the input file
-    _ssd->mergeSSDRuns(_hdd);
+    // if (_ssd->getRunfilesCount() > 0)
+    // _ssd->mergeSSDRuns(_hdd);
 
 #if defined(_VALIDATE)
     // verify the input size and consumed records is same
@@ -144,7 +144,7 @@ void SortIterator::externalMergeSort() {
     this->firstPass();
     auto endFirstPass = std::chrono::steady_clock::now();
     auto durFirstPass = std::chrono::duration_cast<std::chrono::seconds>(endFirstPass - start);
-    printvv("\n============= FIRST_PASS COMPLETE ===========\n");
+    printvv("============= FIRST_PASS COMPLETE ===========\n");
     printvv("First pass Duration: %lld sec / %lld minutes\n", durFirstPass.count(),
             durFirstPass.count() / 60);
     flushvv();
@@ -206,5 +206,7 @@ void SortIterator::externalMergeSort() {
     printvv("======== EXTERNAL_MERGE_SORT COMPLETE =========\n");
     printvv("Total Sort Duration %lld sec / %lld minutes\n", durTotal.count(),
             durTotal.count() / 60);
+    printvv("Removed %lld duplicate records out of %lld duplicates\n",
+            Config::NUM_DUPLICATES_REMOVED, Config::NUM_DUPLICATES);
     flushvv();
 } // SortIterator::externalMergeSort

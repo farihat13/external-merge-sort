@@ -58,6 +58,9 @@ class Config {
     static int RECORD_KEY_SIZE;  // 8 bytes
     static int RECORD_SIZE;      // 1024 bytes
     static RowCount NUM_RECORDS; // 20 records
+    // ---- Duplicate ----
+    static RowCount NUM_DUPLICATES;
+    static RowCount NUM_DUPLICATES_REMOVED;
     // ---- VERIFY ----
     static std::string VERIFY_INPUTDIR;
     static std::string VERIFY_OUTPUTDIR;

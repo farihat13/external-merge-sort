@@ -1,5 +1,5 @@
 # compiler options
-CPPOPT=-g -Og -D_VALIDATE -D_USE_LOGFILE #-D_SMALL#-D_DEBUG #-D_SMALL #-D_VERIFY #-D_SMALL #-D_USE_LOGFILE #-D_DUP_CHECK #-DUP_GEN
+CPPOPT=-g -Og -D_VALIDATE -D_USE_LOGFILE -D_DUP_GEN -D_DEBUG #-D_SMALL #-D_VERIFY #-D_SMALL #-D_USE_LOGFILE #-D_DUP_CHECK #-DUP_GEN
 # -O2 -Os -Ofast
 # -fprofile-generate -fprofile-use
 # -fsanitize=address -fsanitize=leak -fsanitize=undefined
@@ -35,13 +35,13 @@ run: $(TARGET)
 	./$(TARGET) -c 2500000 -s 1000
 
 run1G: $(TARGET)
-	./$(TARGET) -c 1200000 -s 1000
+	./$(TARGET) -c 1200000 -s 1000 -v
 
 run5G: $(TARGET)
-	./$(TARGET) -c 6000000 -s 1024
+	./$(TARGET) -c 6000000 -s 1024 -v
 
 run10G: $(TARGET)
-	./$(TARGET) -c 11000000 -s 1024
+	./$(TARGET) -c 11000000 -s 1024 -v
 
 run20G: $(TARGET)
 	./$(TARGET) -c 22000000 -s 1024
@@ -57,10 +57,8 @@ run2G: $(TARGET)
 	./$(TARGET) -c 3000000 -s 1000 >> trace
 	@size -t $(TARGET) $(OBJS) | sort -r >> trace
 
-run100M: $(TARGET)
-#	@date > trace
-	./$(TARGET) -c 100000 -s 1000 
-#	@size -t $(TARGET) $(OBJS) | sort -r >> trace
+run5M: $(TARGET)
+	./$(TARGET) -c 50 -s 100 -v
 
 list : Makefile
 	echo Makefile $(HDRS) $(SRCS) $(DOCS) $(SCRS) > list

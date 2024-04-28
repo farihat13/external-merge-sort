@@ -128,10 +128,14 @@ class Run {
             }
             curr = curr->next;
             i++;
+            if (i >= size - 1) {
+                i++;
+                break;
+            }
         }
-        i++;
         if (i != size) {
             printv("ERROR: Run size %lld is less than expected %lld\n", i, size);
+            flushv();
             return false;
         }
         return true;

@@ -64,7 +64,7 @@ RowCount genInputBatch(const std::string &filename, const RowCount count) {
     srand(time(0));
 #if defined(_DEBUG)
     // seed is fixed for reproducibility
-    // srand(100);
+    srand(100);
 #endif
     traceprintf("generating input file '%s'\n", filename.c_str());
     std::string tmpfilename = filename + ".tmp";
@@ -90,14 +90,11 @@ RowCount genInputBatch(const std::string &filename, const RowCount count) {
             record[Config::RECORD_SIZE - 1] = '\n'; // TODO: remove later
             n++;
             record += Config::RECORD_SIZE;
-        }
-        char *duplicate = buffer;
-        for (RowCount j = 0; j < batchSize / 2; j++) {
-            memcpy(record, duplicate, Config::RECORD_SIZE);
+            // duplicate the record
+            memcpy(record, record - Config::RECORD_SIZE, Config::RECORD_SIZE);
+            dup++;
             n++;
             record += Config::RECORD_SIZE;
-            duplicate += Config::RECORD_SIZE;
-            dup++;
         }
 #else
         for (RowCount j = 0; j < batchSize; j++) {
@@ -124,10 +121,11 @@ RowCount genInputBatch(const std::string &filename, const RowCount count) {
         input_file.write(buffer, Config::RECORD_SIZE * batchSize);
         // printv("%lld\n", n);
     }
-    printvv("Generated %lu records (%lu of them are duplicate)\n", n, dup);
     input_file.close();
     // rename the file
     rename(tmpfilename.c_str(), filename.c_str());
+    Config::NUM_DUPLICATES = dup;
+    printvv("Generated %lu records (%lu of them are duplicate) in %s\n", n, dup, filename.c_str());
 
     // free memory
     delete[] buffer;
@@ -154,8 +152,7 @@ ScanIterator::ScanIterator(ScanPlan const *const plan) : _plan(plan), _count(0) 
         auto end = std::chrono::steady_clock::now();
         auto dur = std::chrono::duration_cast<std::chrono::seconds>(end - start);
         printvv("======= INPUT_FILE_GEN COMPLETE ========\n");
-        printvv("Generated %lld records in %s, Duration %lld seconds / %lld minutes\n", n,
-                plan->_filename.c_str(), dur.count(), dur.count() / 60);
+        printvv("Duration %lld seconds / %lld minutes\n", n, dur.count(), dur.count() / 60);
         flushvv();
         if (n != plan->_count) {
             printvv("ERROR: generated %lld records instead of %lld\n", n, plan->_count);

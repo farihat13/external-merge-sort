@@ -29,6 +29,9 @@ int Config::HDD_BANDWIDTH = 100 * 1024 * 1024;            // 100 MB/s
 int Config::RECORD_KEY_SIZE = 8;          // 8 bytes
 int Config::RECORD_SIZE = 1024;           // 1024 bytes
 RowCount Config::NUM_RECORDS = 2200000LL; // 20 records
+// ---- Duplicate ----
+RowCount Config::NUM_DUPLICATES = 0;
+RowCount Config::NUM_DUPLICATES_REMOVED = 0;
 // ---- Verify ----
 bool Config::VERIFY_ONLY = false;
 bool Config::VERIFY = false;
