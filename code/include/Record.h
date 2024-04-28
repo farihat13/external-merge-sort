@@ -30,7 +30,9 @@ class Record {
         data = new char[Config::RECORD_SIZE];
         next = nullptr;
     }
-    Record(char *data) : data(data), next(nullptr) {}
+    Record(char *data) : data(data), next(nullptr) {
+        // TODO: fix this
+    }
     ~Record() {
         if (data != nullptr) {
             delete[] data;

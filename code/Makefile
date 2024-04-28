@@ -63,4 +63,4 @@ clean :
 
 cleanall:
 	@rm -f $(OBJS) ExternalSort.exe ExternalSort.exe.stackdump trace list count input*.txt output*.txt
-	@rm -rf HDD_runs SSD_runs DRAM_runs *.tmp
+	@rm -rf HDD_runs SSD_runs DRAM_runs *.tmp Verify_parts

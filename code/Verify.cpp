@@ -22,7 +22,7 @@
 char *readRecordsFromFile(std::ifstream &file, RowCount nRecordsPerRead, RowCount *nRecordsLoaded) {
     char *data = new char[nRecordsPerRead * Config::RECORD_SIZE];
     file.read(data, nRecordsPerRead * Config::RECORD_SIZE);
-    int nBytes = file.gcount();
+    ByteCount nBytes = file.gcount();
     *nRecordsLoaded = nBytes / Config::RECORD_SIZE;
     return data;
 }
@@ -88,9 +88,10 @@ bool verifyOrder(const std::string &outputFilePath, uint64_t capacityMB) {
         }
 
         Record *record = new Record(data);
-        int compare = std::strncmp(prevRecord->data, record->data, Config::RECORD_SIZE);
+        int compare = std::strncmp(prevRecord->data, record->data, Config::RECORD_KEY_SIZE);
         if (compare > 0) {
             printvv("ERROR: Record %ld is not sorted\n", i);
+            printvv("prev: %s, curr: %s\n", prevRecord->reprKey(), record->reprKey());
             ordered = false;
         }
 
@@ -148,6 +149,7 @@ void partitionFile(const std::string &inputFilePath, const std::string &hashFile
     while (1) {
         data = readRecordsFromFile(inputFile, nRecordsPerRead, &nRecordsLoaded);
         if (data == nullptr || nRecordsLoaded == 0) { break; }
+        printf("Number of records loaded: %ld\n", nRecordsLoaded);
 
         for (RowCount i = 0; i < nRecordsLoaded; i++) {
             Record *record = new Record(data + i * Config::RECORD_SIZE);
@@ -156,7 +158,8 @@ void partitionFile(const std::string &inputFilePath, const std::string &hashFile
             // free(record);
             record->data = nullptr;
         }
-        free(data);
+        if (data != nullptr) { free(data); }
+        // free(data);
     }
 
     for (u_int64_t i = 0; i < nPartitions; i++) {
@@ -167,11 +170,11 @@ void partitionFile(const std::string &inputFilePath, const std::string &hashFile
 }
 
 bool contains(const std::vector<Record *> &arr, Record *target) {
-    int left = 0;
-    int right = arr.size() - 1;
+    size_t left = 0;
+    size_t right = arr.size() - 1;
 
     while (left <= right) {
-        int mid = left + (right - left) / 2; // Prevent potential overflow
+        size_t mid = left + (right - left) / 2; // Prevent potential overflow
         int compare = std::strncmp(arr[mid]->data, target->data, Config::RECORD_SIZE);
 
         if (compare == 0) {
@@ -238,9 +241,10 @@ bool compareHashFiles(uint64_t i, const std::string &inputDir, const std::string
 
         if (!found) {
             printvv("ERROR: Record %ld not found in output partition\n", j);
+            printf("Record: %s\n", record->repr());
             integrity = false;
         }
-        free(record);
+        record->data = nullptr;
     }
 
     for (uint64_t j = 0; j < nOutputRecordsLoaded; j++) {

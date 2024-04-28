@@ -1,5 +1,5 @@
 #include "Sort.h"
-
+#include <chrono>
 
 // ============================================================================
 // ---------------------------------- SortPlan --------------------------------
@@ -134,6 +134,7 @@ void SortIterator::firstPass() {
 void SortIterator::externalMergeSort() {
     TRACE(true);
 
+
     _hddCapacity = _hdd->getCapacityInRecords();
     _hddPageSize = _hdd->getPageSizeInRecords();
     _ssdCapacity = _ssd->getCapacityInRecords();
@@ -141,10 +142,23 @@ void SortIterator::externalMergeSort() {
     _dramCapacity = _dram->getCapacityInRecords();
     _dramPageSize = _dram->getPageSizeInRecords();
 
-    // TODO:
-    // 1. Create initial sorted runs
+
+    /**
+     * 1. First pass: read records from input file to DRAM, sort them, and spill runs to SSD and
+     * HDD, and merge runs in SSD
+     */
+    auto start = std::chrono::steady_clock::now();
     this->firstPass();
+    auto endFirstPass = std::chrono::steady_clock::now();
+    auto durFirstPass = std::chrono::duration_cast<std::chrono::minutes>(endFirstPass - start);
+    printvv("INFO: first pass completed in %d ms / %d sec/ %d minutes\n", durFirstPass.count(),
+            durFirstPass.count() / 1000, durFirstPass.count() / (1000 * 60));
+    flushv();
     // 2. Merge all runs from SSD to HDD
+    /**
+     * 2. Merge all runs in SSD and HDD
+     *
+     */
     int mergeIteration = 0;
     while (true) {
         int nRFilesInSSD = _ssd->getRunfilesCount();
@@ -186,6 +200,16 @@ void SortIterator::externalMergeSort() {
         }
         ++mergeIteration;
     }
-    printvv("INFO: all runs merged\n");
+    printvv("SUCCESS: External merge sort complete.\n");
+    auto endMerge = std::chrono::steady_clock::now();
+    auto durMerge = std::chrono::duration_cast<std::chrono::minutes>(endMerge - endFirstPass);
+    printvv("INFO: merge completed in %d ms / %d sec/ %d minutes\n", durMerge.count(),
+            durMerge.count() / 1000, durMerge.count() / (1000 * 60));
+
+    printvv("INFO: total run merge iterations %d\n", mergeIteration);
+    auto durTotal = std::chrono::duration_cast<std::chrono::minutes>(endMerge - start);
+    printvv("INFO: total runtime %d ms / %d sec/ %d minutes\n", durTotal.count(),
+            durTotal.count() / 1000, durTotal.count() / (1000 * 60));
+
     flushv();
 } // SortIterator::externalMergeSort
