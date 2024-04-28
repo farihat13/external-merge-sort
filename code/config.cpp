@@ -29,6 +29,9 @@ int Config::HDD_BANDWIDTH = 100 * 1024 * 1024;            // 100 MB/s
 int Config::RECORD_KEY_SIZE = 8;     // 8 bytes
 int Config::RECORD_SIZE = 1024;      // 1024 bytes
 RowCount Config::NUM_RECORDS = 20LL; // 20 records
+// ---- Verify ----
+std::string Config::VERIFY_INPUTDIR = "Verify_parts/input/";
+std::string Config::VERIFY_OUTPUTDIR = "Verify_parts/output/";
 // ---- File ----
 std::string Config::OUTPUT_FILE = "output.txt";
 std::string Config::INPUT_FILE = "input.txt";

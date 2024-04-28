@@ -187,4 +187,5 @@ void SortIterator::externalMergeSort() {
         ++mergeIteration;
     }
     printvv("INFO: all runs merged\n");
+    flushv();
 } // SortIterator::externalMergeSort

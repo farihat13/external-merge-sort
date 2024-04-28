@@ -2,6 +2,7 @@
 #include "Iterator.h"
 #include "Scan.h"
 #include "Sort.h"
+#include "Verify.h"
 #include "config.h"
 #include "defs.h"
 #include <cstdio>
@@ -127,6 +128,13 @@ int main(int argc, char *argv[]) {
 
     // cleanup what was initialized in init()
     cleanup();
+
+#if defined(_VERIFY)
+    uint64_t capacityMB = 1024;
+    verifyOrder(Config::OUTPUT_FILE, capacityMB);
+    verifyIntegrity(Config::INPUT_FILE, Config::OUTPUT_FILE, capacityMB);
+    return 0;
+#endif
 
     return 0;
 } // main

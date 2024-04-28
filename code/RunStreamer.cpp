@@ -270,7 +270,7 @@ RowCount RunStreamer::readStream(RowCount nRecords, bool firstTime) {
         count++;
         curr->next = rec;
         curr = rec;
-        if (count < nRecords) { Record *r = readStreamer->moveNext(); }
+        if (count < nRecords) { readStreamer->moveNext(); }
     }
     // printv("\t\t\t\tRead %lld records\n", count);
     // flushv();
