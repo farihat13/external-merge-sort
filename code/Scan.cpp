@@ -1,9 +1,9 @@
 #include "Scan.h"
 
+#include <chrono>
 #include <cstdlib>
 #include <ctime>
 #include <string>
-
 
 // =========================================================
 // ------------------------- ScanPlan ----------------------
@@ -55,7 +55,7 @@ RowCount genInput(const std::string &filename, const RowCount count) {
     input_file.close();
     // rename the file
     rename(tmpfilename.c_str(), filename.c_str());
-    // cleanup
+    // free memory
     delete[] record;
     return count;
 }
@@ -110,7 +110,10 @@ RowCount genInputBatch(const std::string &filename, const RowCount count) {
         input_file.write(buffer, Config::RECORD_SIZE * batchSize);
         // printv("%lld\n", n);
     }
-    batchSize = count % batchSize;
+    // free memory
+    delete[] buffer;
+    batchSize = count - n;
+    buffer = new char[Config::RECORD_SIZE * batchSize];
     if (batchSize > 0) {
         char *record = buffer;
         for (RowCount j = 0; j < batchSize; j++) {
@@ -127,7 +130,7 @@ RowCount genInputBatch(const std::string &filename, const RowCount count) {
     // rename the file
     rename(tmpfilename.c_str(), filename.c_str());
 
-    // cleanup
+    // free memory
     delete[] buffer;
     // return
     return n;
@@ -145,12 +148,16 @@ ScanIterator::ScanIterator(ScanPlan const *const plan) : _plan(plan), _count(0) 
     TRACE(true);
     // skip if the input file already exists
     if (!std::ifstream(plan->_filename.c_str())) {
+        auto start = std::chrono::high_resolution_clock::now();
         // RowCount n = genInput(plan->_filename, plan->_count);
         RowCount n = genInputBatch(plan->_filename, plan->_count);
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
         if (n != plan->_count) {
             printv("ERROR: generated %lld records instead of %lld\n", n, plan->_count);
             exit(1);
         }
+        printvv("INFO: generated %lld records in %lld ms\n", n, duration.count());
     }
     // NOTE: did not update HDD usage value since its capacity is infinite
     traceprintf("\tinput file %s, size %s\n", _plan->_filename.c_str(),
@@ -161,35 +168,18 @@ ScanIterator::ScanIterator(ScanPlan const *const plan) : _plan(plan), _count(0) 
 
 
 ScanIterator::~ScanIterator() {
-    TRACE(true);
-    // this->_file.close();
-    // traceprintf("produced %lu of %lu rows\n", (unsigned long)(_count),
-    // (unsigned long)(_plan->_count));
+    // TRACE(true);
 } // ScanIterator::~ScanIterator
 
 bool ScanIterator::next() {
-    TRACE(true);
+    // TRACE(true);
     return false;
-    // if (this->_file.eof()) {
-    //     traceprintf("reached end of file\n");
-    //     traceprintf("read %lu of %lu rows\n", (unsigned long)(_count),
-    //                 (unsigned long)(_plan->_count));
-    //     return false;
-    // }
-    // if (_count >= _plan->_count) {
-    //     traceprintf("read all input rows. %lu of %lu rows\n", (unsigned long)(_count),
-    //                 (unsigned long)(_plan->_count));
-    //     return false;
-    // }
-    // return true;
 } // ScanIterator::next
 
-void ScanIterator::getRecord(Record *r) { TRACE(true); }
+void ScanIterator::getRecord(Record *r) {
+    // TRACE(true);
+}
 
 void ScanIterator::getPage(Page *p) {
     // TRACE(true);
-    // p->read(this->_file);
-    // traceprintf("read %llu records\n", p->sizeInRecords());
-    // this->_currpage = p;
-    // _count += p->sizeInRecords();
 } // ScanIterator::getPage

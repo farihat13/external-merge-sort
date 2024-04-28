@@ -20,12 +20,13 @@ class LoserTree {
     std::vector<RunStreamer *> loserTree;
     std::vector<int> indices;
     RunStreamer *dummy;
+    Run *dummyRun;
 
     bool isMax(RunStreamer *r) { return isRecordMax(r->getCurrRecord()); }
 
   public:
     LoserTree() {
-        Run *dummyRun = new Run(getMaxRecord(), 1);
+        dummyRun = new Run(getMaxRecord(), 1);
         dummy = new RunStreamer(StreamerType::INMEMORY_RUN, dummyRun);
         // set the current time reabable format as name
         std::time_t ct = std::time(0);
@@ -38,6 +39,8 @@ class LoserTree {
             if (loserTree[i] != dummy) { delete loserTree[i]; }
         }
         printv("\t\t\t\tDeleted loser tree (%s)\n", name.c_str());
+        // delete dummyRun; // NOTE: do not delete dummyRun, it uses maxRecord which is a global
+        delete dummy;
     }
 
     // print the tree

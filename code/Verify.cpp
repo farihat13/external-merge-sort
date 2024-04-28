@@ -93,6 +93,7 @@ bool verifyOrder(const std::string &outputFilePath, uint64_t capacityMB) {
             printvv("ERROR: Record %ld is not sorted\n", i);
             printvv("prev: %s, curr: %s\n", prevRecord->reprKey(), record->reprKey());
             ordered = false;
+            break;
         }
 
         i += 1;

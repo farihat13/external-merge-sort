@@ -11,19 +11,26 @@
 // =========================================================
 
 RunStreamer::~RunStreamer() {
-    if (run != nullptr) {
-        delete run;
-        run = nullptr;
+    if (type == StreamerType::INMEMORY_RUN) {
+        // do nothing
+        // these runs will be deleted after they get merged and get written to file
+    } else if (type == StreamerType::READER) {
+        if (reader != nullptr) {
+            delete reader;
+            reader = nullptr;
+        }
+        printv("\t\t\t\tRunStreamer %s destroyed\n", repr().c_str());
+    } else if (type == StreamerType::STREAMER) {
+        if (reader != nullptr) {
+            delete reader;
+            reader = nullptr;
+        }
+        if (readStreamer != nullptr) {
+            delete readStreamer;
+            readStreamer = nullptr;
+        }
+        printv("\t\t\t\tRunStreamer %s destroyed\n", repr().c_str());
     }
-    if (reader != nullptr) {
-        delete reader;
-        reader = nullptr;
-    }
-    if (readStreamer != nullptr) {
-        delete readStreamer;
-        readStreamer = nullptr;
-    }
-    printv("\t\t\t\tRunStreamer %s destroyed\n", getName().c_str());
 }
 
 
@@ -41,22 +48,20 @@ RunStreamer::RunStreamer(StreamerType type, Run *run) : type(type), run(run) {
     if (currentRecord == nullptr) { // validate
         throw std::runtime_error("ERROR: RunStreamer initialized with empty run");
     }
+    nextRecord = currentRecord->next;
 }
 
 Record *RunStreamer::moveNextForRun() {
-    if (currentRecord->next == nullptr) {
+    if (nextRecord == nullptr) {
         /** reached the end of the run */
         currentRecord = nullptr;
-        // if (run != nullptr) { // free memory
-        //     delete run;
-        //     run = nullptr;
-        // }
         return nullptr;
     }
     /**
      * move to the next record in the run
      */
-    currentRecord = currentRecord->next;
+    currentRecord = nextRecord;
+    nextRecord = currentRecord->next;
     return currentRecord;
 }
 
@@ -94,15 +99,18 @@ RunStreamer::RunStreamer(StreamerType type, RunReader *reader, Storage *fromDevi
             "ERROR: readAhead" + std::to_string(nRecords) + "  records but failed to read run";
         throw std::runtime_error(errorMsg);
     }
+    nextRecord = currentRecord->next;
     // debug
-    printv("\t\t\tRunStreamer %s initialized, curr_rec %s\n", getName().c_str(),
-           currentRecord->reprKey());
+    printv("\t\t\tRunStreamer %s initialized\n", repr().c_str());
     flushv();
 }
 
 
 RowCount RunStreamer::readAheadPages(PageCount nPages) {
-    if (reader == nullptr) { return 0; }
+    if (reader == nullptr) {
+        // printv("\t\t\t\tReader is null in %s\n", getName().c_str());
+        return 0;
+    }
     // TRACE(true);
     /**
      * 1. read `nPages` pages from the reader
@@ -130,36 +138,25 @@ RowCount RunStreamer::readAheadPages(PageCount nPages) {
             }
             reader->close();
             reader->deleteFile();
-            // delete reader;
-            // reader = nullptr;
         }
     }
-    // if (run != nullptr) { // free memory
-    //     delete run;
-    //     run = nullptr;
-    // }
     /**
      * 2. create a run from the records read, and store in memory `run` variable
      */
     if (nRecordsRead > 0) {
+        // the records in this run will flow through the losertree, and then will be written to
+        // another file, and then the records in the merged run will be deleted
         run = new Run(runHead, nRecordsRead);
-        // if (nRecordsRead >= 2) {
-        //     printv("\t\t\t\tFirst record: %s\n", run->getHead()->reprKey());
-        //     printv("\t\t\t\tSecond record: %s\n", run->getHead()->next->reprKey());
-        // }
     }
-    printv("\t\t\t\tRead %lld records from reader %s, expected to read %lld records\n",
-           nRecordsRead, reader->getFilename().c_str(), nRecordsToRead);
+    // printv("\t\t\t\tRead %lld records from reader %s, expected to read %lld records\n",
+    //        nRecordsRead, reader->getFilename().c_str(), nRecordsToRead);
+    readSoFar += nRecordsRead;
     return nRecordsRead;
 }
 
 
 Record *RunStreamer::moveNextForReader() {
-    if (currentRecord == nullptr) {
-        /** no more records in the reader */
-        return nullptr;
-    }
-    if (currentRecord->next == nullptr) {
+    if (nextRecord == nullptr) {
         /**
          * if this is the last record in the run,
          * 1. read next `readAhead` pages, which will create a new run and store in memory
@@ -168,17 +165,20 @@ Record *RunStreamer::moveNextForReader() {
         RowCount nRecords = readAheadPages(readAhead);
         if (nRecords == 0) {
             currentRecord = nullptr;
+            nextRecord = nullptr;
             return nullptr;
         }
         /**
          * 2. set the current record to the head of the run
          */
         currentRecord = run->getHead();
+        nextRecord = currentRecord->next;
     } else {
         /**
          * if this is not the last record in the run, move to the next record
          */
-        currentRecord = currentRecord->next;
+        currentRecord = nextRecord;
+        nextRecord = currentRecord->next;
     }
     return currentRecord;
 }
@@ -207,18 +207,6 @@ RunStreamer::RunStreamer(StreamerType type, RunStreamer *streamer, Storage *from
     std::string fname = streamer->getFilename();
     fname = fname.substr(fname.find_last_of("/") + 1);
     writerFilename = fromDevice->getBaseDir() + "/buf_" + fname;
-    // // ----------------- debug -----------------
-    // RowCount count = 0;
-    // RowCount nRecords = 19000;
-    // while (true) {
-    //     Record *rec = readStreamer->getCurrRecord();
-    //     if (rec == nullptr) { break; }
-    //     count++;
-    //     printv("\t\t\t\t\t\t(%d) %s\n", count, rec->reprKey());
-    //     if (count < nRecords - 1) { Record *r = readStreamer->moveNext(); }
-    // }
-    // exit(0);
-    // // ----------------- debug -----------------
     /**
      * 2. store `nInBufRecords` Records in a buffer file in `fromDevice`
      */
@@ -247,8 +235,8 @@ RunStreamer::RunStreamer(StreamerType type, RunStreamer *streamer, Storage *from
                                "  records but failed to read run";
         throw std::runtime_error(errorMsg);
     }
-    printv("\t\t\tRunStreamer initialized with STREAMER %s, curr_rec: %s\n",
-           streamer->getName().c_str(), currentRecord->reprKey());
+    nextRecord = currentRecord->next;
+    printv("\t\t\tRunStreamer initialized with STREAMER %s\n", streamer->repr().c_str());
     flushv();
 }
 
@@ -276,18 +264,20 @@ RowCount RunStreamer::readStream(RowCount nRecords, bool firstTime) {
     // flushv();
 
     if (count > 0) {
-        Run run = Run(head->next, count);
         /**
          * 2. write the run to a file in `fromDevice`
          */
+        Run *tempRun = new Run(head->next, count);
         RunWriter writer(writerFilename); // this opens the file in truncate mode
-        writer.writeNextRun(run);
+        writer.writeNextRun(tempRun);
         writer.close();
         printv("\t\t\t\tCreated runwriter %s from streamer filename %s (%lld records)\n",
-               writerFilename.c_str(), readStreamer->getName().c_str(), count);
-        // // free memory
-        // delete head;
-        // // delete run; // the ~Run() will delete the records
+               writerFilename.c_str(), readStreamer->repr().c_str(), count);
+        // free memory
+        if (tempRun != nullptr) {
+            delete tempRun; // this run is created here
+            tempRun = nullptr;
+        }
         /**
          * 3. update the input cluster space of the `fromDevice`
          */
@@ -301,6 +291,11 @@ RowCount RunStreamer::readStream(RowCount nRecords, bool firstTime) {
                fromDevice->getName().c_str(), count * Config::RECORD_SIZE,
                fromDevice->getAccessTimeInMillis(count));
         flushv();
+    }
+    // free memory
+    if (head != nullptr) {
+        delete head; // this head is created here
+        head = nullptr;
     }
     // return the number of records written
     return count;
@@ -320,17 +315,14 @@ Record *RunStreamer::moveNextForStreamer() {
         RowCount nRecordsBuffered = readStream(nInBufRecords);
         if (nRecordsBuffered == 0) {
             currentRecord = nullptr;
+            nextRecord = nullptr;
             return nullptr;
         }
-        // // free memory
-        // if (run != nullptr) {
-        //     delete run;
-        //     run = nullptr;
-        // }
-        // if (reader != nullptr) {
-        //     delete reader;
-        //     reader = nullptr;
-        // }
+        // free memory
+        if (reader != nullptr) {
+            delete reader;
+            reader = nullptr;
+        }
         /**
          * 2. create a reader for the buffer file and read `readAhead` pages to create a run
          */
@@ -351,6 +343,7 @@ Record *RunStreamer::moveNextForStreamer() {
                                    "  records but failed to read run";
             throw std::runtime_error(errorMsg);
         }
+        nextRecord = currentRecord->next;
     }
 
     // printv("moving next to %s for streamer %s\n", currentRecord->reprKey(), getName().c_str());

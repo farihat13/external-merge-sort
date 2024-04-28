@@ -48,7 +48,7 @@ RunManager::~RunManager() {
     if (getRunInfoFromDir().size() > 0) {
         printvv("WARNING: %d run files left in %s\n", runFiles.size(), baseDir.c_str());
     }
-    printv("\tINFO: RunManager deleted for %s\n", baseDir.c_str());
+    printv("\tINFO: RunManager Deleted for %s\n", baseDir.c_str());
 }
 
 
@@ -174,9 +174,9 @@ void Storage::spill(RunWriter *writer) {
 }
 
 
-RowCount Storage::writeNextChunk(RunWriter *writer, Run &run) {
+RowCount Storage::writeNextChunk(RunWriter *writer, Run *run) {
     RowCount _empty = this->getTotalEmptySpaceInRecords();
-    if (run.getSize() > _empty) { spill(writer); }
+    if (run->getSize() > _empty) { spill(writer); }
     /** assumption: spilling the current file to disk will free up enough space */
     RowCount nRecord = writer->writeNextRun(run);
     _filled += nRecord;
@@ -261,47 +261,18 @@ bool Storage::readFrom(const std::string &filePath) {
     return true;
 }
 
-bool Storage::writeTo(const std::string &filePath) {
-    if (writeFile.is_open()) writeFile.close();
-    writeFilePath = filePath;
-    writeFile.open(writeFilePath, std::ios::binary);
-    if (!writeFile.is_open()) {
-        printvv("ERROR: Failed to open write file '%s'\n", writeFilePath.c_str());
-        return false;
-    }
-    writeFile.seekp(0, std::ios::beg);
-    if (!writeFile) {
-        printv("ERROR: Failed to seek to the beginning of '%s'\n", writeFilePath.c_str());
-        return false;
-    }
-    assert(writeFile.is_open() && "Failed to open write file");
-    // printvv("DEBUG: Opened write file '%s', curr pos %llu\n", writeFilePath.c_str(),
-    //         writeFile.tellp());
-    return true;
-}
-
-char *Storage::readRecords(RowCount *toRead) {
-    int nRecords = *toRead;
+RowCount Storage::readRecords(char *data, RowCount nRecords) {
     if (!readFile.is_open()) {
         printvv("ERROR: Read file '%s' is not open\n", readFilePath.c_str());
-        return nullptr;
+        return 0;
     }
-
-    char *data = new char[nRecords * Config::RECORD_SIZE];
     readFile.read(data, nRecords * Config::RECORD_SIZE);
-    int nBytes = readFile.gcount();
-    // printv("\t\tRead %d bytes from '%s', filepos %llu\n", nBytes, readFilePath.c_str(),
-    //        readFile.tellg());
-    *toRead = nBytes / Config::RECORD_SIZE;
-    return data;
+    ByteCount nBytes = readFile.gcount();
+    return nBytes / Config::RECORD_SIZE;
 }
 
 void Storage::closeRead() {
     if (readFile.is_open()) readFile.close();
-}
-
-void Storage::closeWrite() {
-    if (writeFile.is_open()) writeFile.close();
 }
 
 

@@ -26,15 +26,23 @@ class HDD : public Storage {
         if (instance == nullptr) { instance = new HDD(); }
         return instance;
     }
-
+    static void deleteInstance() {
+        if (instance != nullptr) {
+            delete instance;
+            instance = nullptr;
+        }
+    }
     ~HDD() {
-        if (runManager != nullptr) { delete runManager; }
+        if (runManager != nullptr) {
+            delete runManager;
+            runManager = nullptr;
+        }
     }
 
     // void setupMergeState(RowCount outputDevicePageSize, int fanIn);
     // int setupMergeStateForMiniruns(RowCount outputDevicePageSize);
     void mergeHDDRuns();
-    RowCount storeRun(Run &run);
+    RowCount storeRun(Run *run);
     // ---- helper functions ----
     void printStates(std::string where);
 };
@@ -54,7 +62,18 @@ class SSD : public HDD {
         if (instance == nullptr) { instance = new SSD(); }
         return instance;
     }
-    ~SSD() {}
+    static void deleteInstance() {
+        if (instance != nullptr) {
+            delete instance;
+            instance = nullptr;
+        }
+    }
+    ~SSD() {
+        if (runManager != nullptr) {
+            delete runManager;
+            runManager = nullptr;
+        }
+    }
     void setupMergeState(RowCount outputDevicePageSize, int fanIn);
     void mergeSSDRuns(HDD *outputDevice);
 };
@@ -66,13 +85,10 @@ class SSD : public HDD {
 class DRAM : public Storage {
 
   private:
-    // char *buffer;
     static DRAM *instance;
 
     // ---- internal state for generating mini-runs ----
-    Record *_head;              // linked list of Records for loading records
-    std::vector<Run> _miniruns; // Current runs in DRAM
-
+    Record *_head; // linked list of Records for loading records
     DRAM();
 
   public:
@@ -80,15 +96,18 @@ class DRAM : public Storage {
         if (instance == nullptr) { instance = new DRAM(); }
         return instance;
     }
-
-    ~DRAM() { // delete[] buffer;
+    static void deleteInstance() {
+        if (instance != nullptr) {
+            delete instance;
+            instance = nullptr;
+        }
     }
+    ~DRAM() {}
     void setupMergeState(RowCount outputDevicePageSize, int fanIn);
     int setupMergeStateForMiniruns(RowCount outputDevicePageSize);
 
     void reset() {
         _head = nullptr;
-        _miniruns.clear();
         this->resetAllFilledSpace();
     }
     // void loadRecordsToDRAM(char *data, RowCount nRecords);
@@ -96,8 +115,7 @@ class DRAM : public Storage {
     /**
      * @brief will mess up the head and tail pointers
      */
-    void genMiniRuns(RowCount nRecords);
-    void mergeMiniRuns(HDD *outputStorage);
+    void genMiniRuns(RowCount nRecords, HDD *outputStorage);
 };
 
 

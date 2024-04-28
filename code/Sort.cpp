@@ -116,8 +116,8 @@ void SortIterator::firstPass() {
                 _hdd->getReadPosition() / Config::RECORD_SIZE);
 
         // 2. Sort records in DRAM
-        _dram->genMiniRuns(nRecords); // this should sort records in dram and create miniruns
-        _dram->mergeMiniRuns(_ssd);   // this should spill runs to SSD and reset dram
+        _dram->genMiniRuns(nRecords, _ssd); // this should sort records in dram and create miniruns,
+                                            // this should spill runs to SSD and reset dram
     }
     _hdd->closeRead(); // close the input file
     _ssd->mergeSSDRuns(_hdd);
@@ -154,7 +154,7 @@ void SortIterator::externalMergeSort() {
     printvv("INFO: first pass completed in %d ms / %d sec/ %d minutes\n", durFirstPass.count(),
             durFirstPass.count() / 1000, durFirstPass.count() / (1000 * 60));
     flushv();
-    // 2. Merge all runs from SSD to HDD
+    exit(0);
     /**
      * 2. Merge all runs in SSD and HDD
      *

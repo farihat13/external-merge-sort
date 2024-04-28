@@ -33,6 +33,7 @@ class RunStreamer {
   private:
     /** NOTE: must update currentRecord in moveNext */
     Record *currentRecord;
+    Record *nextRecord; // currentRecord might be deleted, so keep a copy of nextRecord
 
     // ===== internal state =====
     // ---- common ----
@@ -43,6 +44,7 @@ class RunStreamer {
     Run *run = nullptr;
     Record *moveNextForRun();
     // ---- for reader ----
+    RowCount readSoFar = 0;
     Record *moveNextForReader();
     // ---- for reader and streamer ----
     RunReader *reader = nullptr;
@@ -75,12 +77,12 @@ class RunStreamer {
     Record *moveNext();
 
 
-    std::string getName() {
+    std::string repr() {
         std::string name = "RS:";
         if (reader != nullptr) {
-            name += " reader: " + reader->getFilename();
+            name += " Reader: " + reader->getFilename();
         } else if (readStreamer != nullptr) {
-            name += " streamer: " + readStreamer->getName();
+            name += " Streamer: " + readStreamer->repr();
         } else {
             name += " InMemory";
         }
@@ -106,7 +108,7 @@ class RunStreamer {
         return *currentRecord == *other.currentRecord;
     }
 
-    char *repr() { return currentRecord->reprKey(); }
+    char *reprKey() { return currentRecord->reprKey(); }
 }; // class RunStreamer
 
 

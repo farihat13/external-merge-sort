@@ -30,8 +30,10 @@ class Record {
         data = new char[Config::RECORD_SIZE];
         next = nullptr;
     }
-    Record(char *data) : data(data), next(nullptr) {
-        // TODO: fix this
+    Record(char *data) {
+        this->data = new char[Config::RECORD_SIZE];
+        std::memcpy(this->data, data, Config::RECORD_SIZE);
+        next = nullptr;
     }
     ~Record() {
         if (data != nullptr) {
@@ -80,14 +82,17 @@ class Run {
   public:
     Run(Record *head, RowCount size) : runHead(head), size(size) {}
     ~Run() {
-        // printv("\t\t\t\tRun destroying\n");
-        // flushv();
-        // Record *curr = runHead;
-        // while (curr != nullptr) {
-        //     Record *next = curr->next;
-        //     delete curr;
-        //     curr = next;
-        // }
+        printv("\t\t\t\tRun destroying\n");
+        flushv();
+        Record *curr = runHead;
+        RowCount i = 0;
+        while (curr != nullptr && i < size) {
+            Record *next = curr->next;
+            delete curr;
+            i++;
+            curr = next;
+        }
+        printv("\t\t\t\tRun destroyed, Deleted %lld out of %lld records\n", i, size);
     }
 
     // getters
@@ -107,6 +112,27 @@ class Run {
             curr = curr->next;
         }
         return buffer;
+    }
+
+    bool isSorted() {
+        Record *curr = runHead;
+        RowCount i = 0;
+        while (curr != nullptr && curr->next != nullptr) {
+            if (*curr > *(curr->next)) {
+                printv("ERROR: Run is not sorted %s > %s\n", curr->reprKey(),
+                       curr->next->reprKey());
+                flushv();
+                return false;
+            }
+            curr = curr->next;
+            i++;
+        }
+        i++;
+        if (i != size) {
+            printv("ERROR: Run size %lld is less than expected %lld\n", i, size);
+            return false;
+        }
+        return true;
     }
 
     // print
@@ -147,42 +173,11 @@ class Page {
         }
         delete &records;
     }
-
     // getters
     RowCount getCapacityInRecords() { return capacity; }
     RowCount getSizeInRecords() { return records.size(); }
     Record *getFirstRecord() { return records.front(); }
     Record *getLastRecord() { return records.back(); }
-    Page *getNext() { return next; }
-
-    // utility functions
-    /**
-     * @brief Add a record to the page, and create chain of records
-     */
-    int addRecord(Record *rec);
-    int addNextPage(Page *page) {
-        // this->getLastRecord()->next = page->getFirstRecord();
-        this->next = page;
-        return 0;
-    }
-
-    // read/write
-    /**
-     * @brief
-     * @return num of records read
-     * @throws runtime_error if read fails
-     */
-    int read(std::ifstream &is);
-    /**
-     * @brief
-     * @return num of records written
-     * @throws runtime_error if write fails
-     */
-    int write(std::ofstream &os);
-
-    // validation
-    bool isSorted() const;
-    bool isValid() const;
 }; // class Page
 
 
@@ -227,7 +222,7 @@ class RunReader {
             }
             _isDeleted = true;
         }
-        printv("\t\t\t\tDEBUG: RunReader DELETED '%s'\n", filename.c_str());
+        printv("\t\t\t\tDEBUG: RunReader Deleted '%s'\n", filename.c_str());
     }
     bool isDeletedFile() { return _isDeleted; }
     // Page *readNextPage();
@@ -236,12 +231,12 @@ class RunReader {
         RowCount nRecordsReadSoFar = 0;
         Record *head = new Record();
         Record *curr = head;
+        ByteCount nBytesToRead = this->PAGE_SIZE_IN_RECORDS * Config::RECORD_SIZE;
+        char *recData = new char[nBytesToRead];
         while (nRecordsReadSoFar < nRecordsToRead) {
             /* if EOF reached, break */
             if (_is.eof()) { break; }
             /** read one page at a time */
-            ByteCount nBytesToRead = this->PAGE_SIZE_IN_RECORDS * Config::RECORD_SIZE;
-            char *recData = new char[nBytesToRead];
             _is.read(recData, nBytesToRead);
             ByteCount nBytesRead = _is.gcount();
             /* if no bytes read, delete record and break */
@@ -251,6 +246,7 @@ class RunReader {
             }
             /* if bytes read is not equal to record size, throw error */
             if (nBytesRead % Config::RECORD_SIZE != 0) {
+                delete[] recData;
                 std::string errorMsg = "ERROR: Read " + std::to_string(nBytesRead) +
                                        " bytes, which is not aligned with record size " +
                                        std::to_string(Config::RECORD_SIZE);
@@ -269,8 +265,10 @@ class RunReader {
         curr->next = nullptr;          // mark the end of the linked list
         *nRecords = nRecordsReadSoFar; // update the number of records read
         curr = head->next;             // skip the dummy head
-        delete head;                   // delete the dummy head
-        return curr;                   // return the head of the linked list
+        // free memory
+        delete head;      // delete the dummy head
+        delete[] recData; // delete the buffer
+        return curr;      // return the head of the linked list
     }
 
 
@@ -309,8 +307,7 @@ class RunWriter {
         printv("\t\t\t\tRunWriter destroyed '%s'\n", _filename.c_str());
     }
 
-    RowCount writeNextPage(Page *page);
-    RowCount writeNextRun(Run &run);
+    RowCount writeNextRun(Run *run);
     RowCount writeFromFile(std::string filename, RowCount toCopyNRecords);
     void reset() {
         if (_os.is_open()) { _os.close(); }
@@ -334,7 +331,7 @@ class RunWriter {
             }
             _isDeleted = true;
         }
-        printv("\t\t\t\tRunReader DELETED '%s'\n", _filename.c_str());
+        printv("\t\t\t\tRunReader Deleted '%s'\n", _filename.c_str());
     }
     bool isDeletedFile() { return _isDeleted; }
     // ---- getters ----

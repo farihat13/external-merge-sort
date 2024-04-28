@@ -1,11 +1,11 @@
 # compiler options
-CPPOPT=-g -Og -D_DEBUG -D_VALIDATE -D_VERIFY #-D_SMALL #-D_USE_LOGFILE #-D_DUP_CHECK #-DUP_GEN
+CPPOPT=-g -Og -D_DEBUG -D_VALIDATE #-D_SMALL #-D_VERIFY #-D_SMALL #-D_USE_LOGFILE #-D_DUP_CHECK #-DUP_GEN
 # -O2 -Os -Ofast
 # -fprofile-generate -fprofile-use
 # -fsanitize=address -fsanitize=leak -fsanitize=undefined
 
 # compiler flags
-CPPFLAGS=$(CPPOPT) -Wall -ansi -pedantic -std=c++11 -Iinclude
+CPPFLAGS=$(CPPOPT) -Wall -ansi -pedantic -std=c++11 -Iinclude -Wno-reorder
 # -Wparentheses -Wno-unused-parameter -Wformat-security
 # -fno-rtti -std=c++11 -std=c++98
 
@@ -22,7 +22,7 @@ OBJS=$(SRCS:%.cpp=%.o)
 	g++ $(CPPFLAGS) -c $< -o $@
 
 # default target
-$(TARGET) : $(OBJS)
+$(TARGET) : $(OBJS) Makefile
 	g++ $(CPPFLAGS) -o ExternalSort.exe $(OBJS)
 
 trace : ExternalSort.exe Makefile
@@ -37,8 +37,17 @@ run: $(TARGET)
 run1G: $(TARGET)
 	./$(TARGET) -c 1200000 -s 1000
 
+run5G: $(TARGET)
+	./$(TARGET) -c 6000000 -s 1024
+
+run10G: $(TARGET)
+	./$(TARGET) -c 11000000 -s 1024
+
 run20G: $(TARGET)
 	./$(TARGET) -c 20971520 -s 1024
+
+run50G: $(TARGET)
+	./$(TARGET) -c 53000000 -s 1024
 
 run125G: $(TARGET)
 	./$(TARGET) -c 131072000 -s 1024

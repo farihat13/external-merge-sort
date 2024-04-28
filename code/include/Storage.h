@@ -88,13 +88,12 @@ class Storage {
     RowCount MERGE_FANIN_IN_RECORDS;   // total #records to merge at a time per input cluster
     RowCount MERGE_FANOUT_IN_RECORDS;  // total #records that can be stored in output clusters
     // ---- read/write buffer ----
-    std::string readFilePath, writeFilePath;
+    std::string readFilePath;
     std::ifstream readFile;
-    std::ofstream writeFile;
 
   protected:
     // run manager
-    RunManager *runManager; // only for HDD and SSD
+    RunManager *runManager = nullptr; // only for HDD and SSD
     // ---- internal state ----
     RowCount _filled = 0; // updated by RunManager
     // used for merging
@@ -117,7 +116,10 @@ class Storage {
     }
 
     ~Storage() {
-        if (runManager != nullptr) { delete runManager; }
+        if (runManager != nullptr) {
+            delete runManager;
+            runManager = nullptr;
+        }
     }
 
   public:
@@ -222,18 +224,15 @@ class Storage {
 
     // --------------------------- FILE I/O ------------------------------------
     std::string getReadFilePath() const { return readFilePath; }
-    std::string getWriteFilePath() const { return writeFilePath; }
     bool readFrom(const std::string &filePath);
-    bool writeTo(const std::string &filePath);
     std::streampos getReadPosition() { return readFile.tellg(); }
-    char *readRecords(RowCount *nRecords);
+    RowCount readRecords(char *data, RowCount nRecords);
     // cleanup
     void closeRead();
-    void closeWrite();
 
     // ---------------------------- run management ----------------------------
     RunWriter *getRunWriter();
-    RowCount writeNextChunk(RunWriter *writer, Run &run);
+    RowCount writeNextChunk(RunWriter *writer, Run *run);
     void closeWriter(RunWriter *writer);
     void addRunFile(std::string filename, RowCount nRecords) {
         runManager->addRunFile(filename, nRecords);

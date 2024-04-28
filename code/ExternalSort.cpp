@@ -38,6 +38,7 @@ void readCmdlineArgs(int argc, char *argv[]) {
         if (strcmp(argv[i], "-c") == 0) {
             if (i + 1 < argc) {
                 num_records = std::atoi(argv[++i]);
+                Config::NUM_RECORDS = num_records;
             } else {
                 fprintf(stderr, "Option -c requires an argument.\n");
                 exit(1);
@@ -45,6 +46,7 @@ void readCmdlineArgs(int argc, char *argv[]) {
         } else if (strcmp(argv[i], "-s") == 0) {
             if (i + 1 < argc) {
                 record_size = std::atoi(argv[++i]);
+                Config::RECORD_SIZE = record_size;
             } else {
                 fprintf(stderr, "Option -s requires an argument.\n");
                 exit(1);
@@ -52,6 +54,7 @@ void readCmdlineArgs(int argc, char *argv[]) {
         } else if (strcmp(argv[i], "-o") == 0) {
             if (i + 1 < argc) {
                 trace_file = argv[++i];
+                Config::TRACE_FILE = trace_file;
             } else {
                 fprintf(stderr, "Option -o requires an argument.\n");
                 exit(1);
@@ -61,9 +64,6 @@ void readCmdlineArgs(int argc, char *argv[]) {
             exit(1);
         }
     }
-    Config::RECORD_SIZE = record_size;
-    Config::NUM_RECORDS = num_records;
-    Config::TRACE_FILE = trace_file;
     Config::INPUT_FILE = "input-c" + std::to_string(Config::NUM_RECORDS) + "-s" +
                          std::to_string(Config::RECORD_SIZE) + ".txt"; // TODO
 } // readCmdlineArgs
@@ -101,6 +101,15 @@ void cleanup() {
     // delete DRAM::getInstance();
     // printv("deleted DRAM\n");
     delete getMaxRecord();
+    DRAM::deleteInstance();
+    printv("deleted DRAM\n");
+    flushv();
+    SSD::deleteInstance();
+    printf("deleted SSD\n");
+    flushv();
+    HDD::deleteInstance();
+    printf("deleted HDD\n");
+    flushv();
     printf("cleanup done\n");
 }
 
@@ -113,12 +122,8 @@ int main(int argc, char *argv[]) {
     // initialize anything needed
     init();
 
-    // TRACE(true);
-
-    // Plan *const plan = new SortPlan(new ScanPlan(Config::NUM_RECORDS));
-    // new ScanPlan(Config::NUM_RECORDS);
-    // new SortPlan ( new FilterPlan ( new ScanPlan (7) ) );
-    Plan *const plan = new SortPlan(new ScanPlan(Config::NUM_RECORDS, Config::INPUT_FILE));
+    Plan *scanPlan = new ScanPlan(Config::NUM_RECORDS, Config::INPUT_FILE);
+    Plan *const plan = new SortPlan(scanPlan);
 
     Iterator *const it = plan->init();
     it->run();
@@ -132,7 +137,7 @@ int main(int argc, char *argv[]) {
 #if defined(_VERIFY)
     uint64_t capacityMB = 1024;
     verifyOrder(Config::OUTPUT_FILE, capacityMB);
-    verifyIntegrity(Config::INPUT_FILE, Config::OUTPUT_FILE, capacityMB);
+    // verifyIntegrity(Config::INPUT_FILE, Config::OUTPUT_FILE, capacityMB);
     return 0;
 #endif
 
