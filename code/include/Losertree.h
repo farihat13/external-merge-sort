@@ -39,7 +39,9 @@ class LoserTree {
             if (loserTree[i] != dummy) { delete loserTree[i]; }
         }
         printv("\t\t\t\tDeleted loser tree (%s)\n", name.c_str());
-        // delete dummyRun; // NOTE: do not delete dummyRun, it uses maxRecord which is a global
+        // NOTE: do not delete dummyRun, it uses maxRecord which is a global
+        dummyRun->setHead(nullptr);
+        delete dummyRun;
         delete dummy;
     }
 

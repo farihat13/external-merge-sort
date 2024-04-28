@@ -148,6 +148,7 @@ void HDD::mergeHDDRuns() {
     printStates("DEBUG: before mergeHDDRuns");
 
     RowCount _ssdPageSize, _hddPageSize, _ssdEmptySpace;
+    _ssdPageSize = SSD::getInstance()->getPageSizeInRecords();
     _hddPageSize = HDD::getInstance()->getPageSizeInRecords();
     _ssdEmptySpace = SSD::getInstance()->getTotalEmptySpaceInRecords();
     printv("\t\t\t_ssdPageSize %lld, _hddPageSize %lld\n", _ssdPageSize, _hddPageSize);
@@ -223,8 +224,8 @@ void HDD::mergeHDDRuns() {
                         runningCount);
             }
             assert(nRecord == runningCount && "ERROR: Writing run to file");
-            // // free memory
-            // delete merged;
+            // free memory
+            delete merged;
             // reset the head
             head->next = nullptr;
             current = head;
@@ -242,8 +243,8 @@ void HDD::mergeHDDRuns() {
                runningCount * Config::RECORD_SIZE, getSSDAccessTime(runningCount));
         flushv();
         assert(nRecord == runningCount && "ERROR: Writing run to file");
-        // // free memory
-        // delete merged;
+        // free memory
+        delete merged;
         // room for optimization
     }
     flushv();
@@ -422,7 +423,7 @@ void SSD::mergeSSDRuns(HDD *outputDevice) {
     RowCount runningCount = 0;
     while (true) {
         Record *winner = loserTree.getNext();
-        if (winner == NULL) { break; }
+        if (winner == nullptr) { break; }
         flushv();
         current->next = winner;
         current = current->next;
@@ -436,8 +437,9 @@ void SSD::mergeSSDRuns(HDD *outputDevice) {
             // write the sorted records to SSD
             Run *merged = new Run(head->next, runningCount);
             RowCount nRecord = _ssd->writeNextChunk(writer, merged);
-            printv("\t\t\tSTATE -> Merging runs, writing %llu records in output buffer to %s\n",
-                   runningCount, writer->getFilename().c_str());
+            printv("\t\t\tSTATE -> Merging runs, writing %llu records in output buffer to %s, "
+                   "Sorted so far %lld records\n",
+                   runningCount, writer->getFilename().c_str(), nSorted);
             printv(
                 "\t\t\tACCESS -> A write to SSD was made with size %llu bytes and latency %d ms\n",
                 runningCount * Config::RECORD_SIZE, getSSDAccessTime(runningCount));
@@ -445,9 +447,10 @@ void SSD::mergeSSDRuns(HDD *outputDevice) {
                 printvv("ERROR: Writing run to file: nRec %lld != runningCount %lld\n", nRecord,
                         runningCount);
             }
+            flushv();
             assert(nRecord == runningCount && "ERROR: Writing run to file");
             // free memory
-            // delete merged;
+            delete merged;
             // reset the head
             head->next = nullptr;
             current = head;
@@ -463,9 +466,10 @@ void SSD::mergeSSDRuns(HDD *outputDevice) {
                writer->getFilename().c_str());
         printv("\t\t\tACCESS -> A write to SSD was made with size %llu bytes and latency %d ms\n",
                runningCount * Config::RECORD_SIZE, getSSDAccessTime(runningCount));
+        flushv();
         assert(nRecord == runningCount && "ERROR: Writing run to file");
         // free memory
-        // delete merged;
+        delete merged;
         // room for optimization
     }
     /**
@@ -484,7 +488,7 @@ void SSD::mergeSSDRuns(HDD *outputDevice) {
     _dram->reset();
 
     // free memory
-    // for (auto streamer : runStreamers) {
+    // for (auto streamer : runStreamers) { // NOTE: loserTree will delete the streamers
     //     delete streamer;
     // }
     delete head;

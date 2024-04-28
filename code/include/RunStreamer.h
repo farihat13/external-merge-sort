@@ -78,26 +78,27 @@ class RunStreamer {
 
 
     std::string repr() {
-        std::string name = "RS:";
-        if (reader != nullptr) {
-            name += " Reader: " + reader->getFilename();
-        } else if (readStreamer != nullptr) {
-            name += " Streamer: " + readStreamer->repr();
-        } else {
-            name += " InMemory";
+        std::string str = "RS:";
+        if (type == StreamerType::INMEMORY_RUN) {
+            str += " InMemory: ";
+        } else if (type == StreamerType::READER) {
+            str += " Reader: ";
+        } else if (type == StreamerType::STREAMER) {
+            str += " Streamer: ";
         }
-        return name;
+        str += this->getFilename();
+        return str;
     }
 
     std::string getFilename() {
         if (type == StreamerType::INMEMORY_RUN) {
             return "InMemory";
         } else if (type == StreamerType::READER) {
-            return reader->getFilename();
+            if (reader != nullptr) { return reader->getFilename(); }
         } else if (type == StreamerType::STREAMER) {
-            return readStreamer->getFilename();
+            if (readStreamer != nullptr) { return readStreamer->getFilename(); }
         }
-        return "InMemory";
+        return "Unknown";
     }
 
     // default comparison based on first 8 bytes of data

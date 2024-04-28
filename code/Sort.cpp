@@ -154,7 +154,6 @@ void SortIterator::externalMergeSort() {
     printvv("INFO: first pass completed in %d ms / %d sec/ %d minutes\n", durFirstPass.count(),
             durFirstPass.count() / 1000, durFirstPass.count() / (1000 * 60));
     flushv();
-    exit(0);
     /**
      * 2. Merge all runs in SSD and HDD
      *

@@ -108,10 +108,15 @@ RunStreamer::RunStreamer(StreamerType type, RunReader *reader, Storage *fromDevi
 
 RowCount RunStreamer::readAheadPages(PageCount nPages) {
     if (reader == nullptr) {
-        // printv("\t\t\t\tReader is null in %s\n", getName().c_str());
+        // printvv("\t\t\t\tRunStreamer Reader is null\n");
+        // flushv();
         return 0;
     }
-    // TRACE(true);
+    if (reader->isDeletedFile()) {
+        // printvv("\t\t\t\tRunStreamer Reader is deleted\n");
+        // flushv();
+        return 0;
+    }
     /**
      * 1. read `nPages` pages from the reader
      */
@@ -147,16 +152,29 @@ RowCount RunStreamer::readAheadPages(PageCount nPages) {
         // the records in this run will flow through the losertree, and then will be written to
         // another file, and then the records in the merged run will be deleted
         run = new Run(runHead, nRecordsRead);
+    } else {
+        // NOTE: do not delete the run here, it will be deleted after the merge
+        run = nullptr;
     }
-    // printv("\t\t\t\tRead %lld records from reader %s, expected to read %lld records\n",
-    //        nRecordsRead, reader->getFilename().c_str(), nRecordsToRead);
     readSoFar += nRecordsRead;
+    printv("\t\t\t\tRunStreamer Read %lld records from reader %s, expected %lld records, readSoFar "
+           "%lld\n",
+           nRecordsRead, reader->getFilename().c_str(), nRecordsToRead, readSoFar);
+    printv("\t\t\t\tSTATE -> Read %lld records in RAP\n", nRecordsRead);
+    printv("\t\t\t\tACCESS -> A read from %s was made with size %llu bytes and latency %d ms\n",
+           fromDevice->getName().c_str(), nRecordsRead * Config::RECORD_SIZE,
+           fromDevice->getAccessTimeInMillis(nRecordsRead));
+    flushv();
     return nRecordsRead;
 }
 
 
 Record *RunStreamer::moveNextForReader() {
     if (nextRecord == nullptr) {
+        // printv("\t\t\t\tRunStreamer %s exhausted bufread, readSoFar %lld\n",
+        // this->repr().c_str(),
+        //        readSoFar);
+        // flushv();
         /**
          * if this is the last record in the run,
          * 1. read next `readAhead` pages, which will create a new run and store in memory

@@ -93,10 +93,12 @@ class Run {
             curr = next;
         }
         printv("\t\t\t\tRun destroyed, Deleted %lld out of %lld records\n", i, size);
+        flushv();
     }
 
     // getters
     Record *getHead() { return runHead; }
+    void setHead(Record *head) { runHead = head; }
     RowCount getSize() { return size; }
 
     char *getAllData() {
@@ -205,7 +207,9 @@ class RunReader {
         printv("\t\t\t\tRunReader opened '%s'\n", filename.c_str());
     }
     ~RunReader() {
-        if (_is.is_open()) { _is.close(); }
+        if (!_isDeleted) {
+            if (_is.is_open()) { _is.close(); }
+        }
         printv("\t\t\t\tRunReader destroyed '%s'\n", filename.c_str());
     }
     void close() {
@@ -227,6 +231,7 @@ class RunReader {
     bool isDeletedFile() { return _isDeleted; }
     // Page *readNextPage();
     Record *readNextRecords(RowCount *nRecords) {
+        TRACE(true);
         RowCount nRecordsToRead = *nRecords;
         RowCount nRecordsReadSoFar = 0;
         Record *head = new Record();
@@ -240,10 +245,7 @@ class RunReader {
             _is.read(recData, nBytesToRead);
             ByteCount nBytesRead = _is.gcount();
             /* if no bytes read, delete record and break */
-            if (nBytesRead == 0) {
-                delete[] recData;
-                break;
-            }
+            if (nBytesRead == 0) { break; }
             /* if bytes read is not equal to record size, throw error */
             if (nBytesRead % Config::RECORD_SIZE != 0) {
                 delete[] recData;
@@ -260,6 +262,8 @@ class RunReader {
                 curr = rec;
                 nRecordsReadSoFar++;
             }
+            // printv("\t\t\t\tRead %lld records\n", nRecordsReadSoFar);
+            // flushv();
         }
         /** return the head of the linked list */
         curr->next = nullptr;          // mark the end of the linked list
