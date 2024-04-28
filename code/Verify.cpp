@@ -65,12 +65,12 @@ bool verifyOrder(const std::string &outputFilePath, uint64_t capacityMB) {
     RowCount nRecordsPerRead = capacityBytes / Config::RECORD_SIZE;
 
     RowCount nRecordsLoaded = 0;
-    RowCount nRecords = nRecordsLoaded;
     RowCount i = 1;
 
     int comparisonLength = Config::RECORD_KEY_SIZE;
     char *data = readRecordsFromFile(outputFile, nRecordsPerRead, &nRecordsLoaded);
     char *startData = data;
+    RowCount nRecords = nRecordsLoaded;
 
     // read first record
     char *prevRecord = new char[comparisonLength];
