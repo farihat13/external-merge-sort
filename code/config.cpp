@@ -31,8 +31,10 @@ int Config::RECORD_SIZE = 1024;           // 1024 bytes
 RowCount Config::NUM_RECORDS = 2200000LL; // 20 records
 // ---- Verify ----
 bool Config::VERIFY_ONLY = false;
+bool Config::VERIFY = false;
 std::string Config::VERIFY_INPUTDIR = "Verify_parts/input/";
 std::string Config::VERIFY_OUTPUTDIR = "Verify_parts/output/";
+int Config::VERIFY_HASH_BYTES = sizeof(uint64_t);
 // ---- File ----
 std::string Config::OUTPUT_FILE = "output.txt";
 std::string Config::INPUT_FILE = "input.txt";

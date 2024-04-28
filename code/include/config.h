@@ -62,6 +62,8 @@ class Config {
     static std::string VERIFY_INPUTDIR;
     static std::string VERIFY_OUTPUTDIR;
     static bool VERIFY_ONLY;
+    static bool VERIFY;
+    static int VERIFY_HASH_BYTES;
     // ---- File ----
     static std::string OUTPUT_FILE;
     static std::string INPUT_FILE;

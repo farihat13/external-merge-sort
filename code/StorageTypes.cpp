@@ -147,12 +147,9 @@ void HDD::mergeHDDRuns() {
     // print all device information
     printStates("DEBUG: before mergeHDDRuns");
 
-    RowCount _ssdPageSize, _hddPageSize, _ssdEmptySpace;
-    _ssdPageSize = SSD::getInstance()->getPageSizeInRecords();
+    RowCount _hddPageSize, _ssdEmptySpace;
     _hddPageSize = HDD::getInstance()->getPageSizeInRecords();
     _ssdEmptySpace = SSD::getInstance()->getTotalEmptySpaceInRecords();
-    printv("\t\t\t_ssdPageSize %lld, _hddPageSize %lld\n", _ssdPageSize, _hddPageSize);
-
     /**
      * 1. verify _ssd is reasonably empty; at least 2 runs from hdd should fit in ssd
      * and at least 2 output buffers should fit in ssd

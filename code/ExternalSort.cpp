@@ -63,13 +63,15 @@ void readCmdlineArgs(int argc, char *argv[]) {
             }
         } else if (strcmp(argv[i], "-vo") == 0) {
             Config::VERIFY_ONLY = true;
+        } else if (strcmp(argv[i], "-v") == 0) {
+            Config::VERIFY = true;
         } else {
             fprintf(stderr, "Unknown option: %s\n", argv[i]);
             exit(1);
         }
     }
     Config::INPUT_FILE = "input-c" + std::to_string(Config::NUM_RECORDS) + "-s" +
-                         std::to_string(Config::RECORD_SIZE) + ".txt"; // TODO
+                         std::to_string(Config::RECORD_SIZE) + ".txt";
 } // readCmdlineArgs
 
 
@@ -134,8 +136,8 @@ int main(int argc, char *argv[]) {
         cleanup();
     }
 
-    if (Config::VERIFY_ONLY) {
-        uint64_t capacityMB = 1024;
+    if (Config::VERIFY_ONLY || Config::VERIFY) {
+        uint64_t capacityMB = 1024; // 1 GB or 1024 memory used for verification
         verifyOrder(Config::OUTPUT_FILE, capacityMB);
         verifyIntegrity(Config::INPUT_FILE, Config::OUTPUT_FILE, capacityMB);
     }
