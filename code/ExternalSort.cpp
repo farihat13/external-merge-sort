@@ -20,6 +20,8 @@
  *  `-c` number of records
  *  `-s` size of each record
  *  `-o` output file
+ *  `-v` verify the output file
+ *  `-vo` verify the output file only`
  *
  * ./ExternalSort.exe -c 20 -s 1024 -o trace0.txt
  * @param argc
@@ -59,6 +61,8 @@ void readCmdlineArgs(int argc, char *argv[]) {
                 fprintf(stderr, "Option -o requires an argument.\n");
                 exit(1);
             }
+        } else if (strcmp(argv[i], "-vo") == 0) {
+            Config::VERIFY_ONLY = true;
         } else {
             fprintf(stderr, "Unknown option: %s\n", argv[i]);
             exit(1);
@@ -113,27 +117,30 @@ int main(int argc, char *argv[]) {
     // read command line arguments
     readCmdlineArgs(argc, argv);
 
-    // initialize anything needed
-    init();
+    if (!Config::VERIFY_ONLY) {
+        // initialize anything needed
+        init();
 
-    Plan *scanPlan = new ScanPlan(Config::NUM_RECORDS, Config::INPUT_FILE);
-    Plan *const plan = new SortPlan(scanPlan);
+        Plan *scanPlan = new ScanPlan(Config::NUM_RECORDS, Config::INPUT_FILE);
+        Plan *const plan = new SortPlan(scanPlan);
 
-    Iterator *const it = plan->init();
-    it->run();
+        Iterator *const it = plan->init();
+        it->run();
 
-    delete it;
-    delete plan;
+        delete it;
+        delete plan;
 
-    // cleanup what was initialized in init()
-    cleanup();
+        // cleanup what was initialized in init()
+        cleanup();
+    }
 
-#if defined(_VERIFY)
-    uint64_t capacityMB = 1024;
-    verifyOrder(Config::OUTPUT_FILE, capacityMB);
-    // verifyIntegrity(Config::INPUT_FILE, Config::OUTPUT_FILE, capacityMB);
+    if (Config::VERIFY_ONLY) {
+        uint64_t capacityMB = 1024;
+        verifyOrder(Config::OUTPUT_FILE, capacityMB);
+        verifyIntegrity(Config::INPUT_FILE, Config::OUTPUT_FILE, capacityMB);
+    }
     return 0;
-#endif
+
 
     return 0;
 } // main

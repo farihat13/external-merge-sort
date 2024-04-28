@@ -108,7 +108,6 @@ RowCount genInputBatch(const std::string &filename, const RowCount count) {
         }
 #endif
         input_file.write(buffer, Config::RECORD_SIZE * batchSize);
-        // printv("%lld\n", n);
     }
     // free memory
     delete[] buffer;
@@ -125,7 +124,7 @@ RowCount genInputBatch(const std::string &filename, const RowCount count) {
         input_file.write(buffer, Config::RECORD_SIZE * batchSize);
         // printv("%lld\n", n);
     }
-    traceprintf("generated %lu records (%lu of them are duplicate)\n", n, dup);
+    printvv("Generated %lu records (%lu of them are duplicate)\n", n, dup);
     input_file.close();
     // rename the file
     rename(tmpfilename.c_str(), filename.c_str());
@@ -148,20 +147,24 @@ ScanIterator::ScanIterator(ScanPlan const *const plan) : _plan(plan), _count(0) 
     TRACE(true);
     // skip if the input file already exists
     if (!std::ifstream(plan->_filename.c_str())) {
-        auto start = std::chrono::high_resolution_clock::now();
+        printvv("========== INPUT_FILE_GEN START ========\n");
+        auto start = std::chrono::steady_clock::now();
         // RowCount n = genInput(plan->_filename, plan->_count);
         RowCount n = genInputBatch(plan->_filename, plan->_count);
-        auto end = std::chrono::high_resolution_clock::now();
-        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+        auto end = std::chrono::steady_clock::now();
+        auto dur = std::chrono::duration_cast<std::chrono::seconds>(end - start);
+        printvv("======= INPUT_FILE_GEN COMPLETE ========\n");
+        printvv("Generated %lld records in %s, Duration %lld seconds / %lld minutes\n", n,
+                plan->_filename.c_str(), dur.count(), dur.count() / 60);
+        flushvv();
         if (n != plan->_count) {
-            printv("ERROR: generated %lld records instead of %lld\n", n, plan->_count);
+            printvv("ERROR: generated %lld records instead of %lld\n", n, plan->_count);
             exit(1);
         }
-        printvv("INFO: generated %lld records in %lld ms\n", n, duration.count());
     }
     // NOTE: did not update HDD usage value since its capacity is infinite
-    traceprintf("\tinput file %s, size %s\n", _plan->_filename.c_str(),
-                getSizeDetails(_plan->_count * Config::RECORD_SIZE).c_str());
+    printv("\tinput file %s, size %s\n", _plan->_filename.c_str(),
+           getSizeDetails(_plan->_count * Config::RECORD_SIZE).c_str());
     printv("\tinput file has %llu records\n", _plan->_count);
 
 } // ScanIterator::ScanIterator

@@ -108,12 +108,12 @@ RunStreamer::RunStreamer(StreamerType type, RunReader *reader, Storage *fromDevi
 
 RowCount RunStreamer::readAheadPages(PageCount nPages) {
     if (reader == nullptr) {
-        // printvv("\t\t\t\tRunStreamer Reader is null\n");
+        // printv("\t\t\t\tRunStreamer Reader is null\n");
         // flushv();
         return 0;
     }
     if (reader->isDeletedFile()) {
-        // printvv("\t\t\t\tRunStreamer Reader is deleted\n");
+        // printv("\t\t\t\tRunStreamer Reader is deleted\n");
         // flushv();
         return 0;
     }
@@ -160,10 +160,10 @@ RowCount RunStreamer::readAheadPages(PageCount nPages) {
     printv("\t\t\t\tRunStreamer Read %lld records from reader %s, expected %lld records, readSoFar "
            "%lld\n",
            nRecordsRead, reader->getFilename().c_str(), nRecordsToRead, readSoFar);
-    printv("\t\t\t\tSTATE -> Read %lld records in RAP\n", nRecordsRead);
-    printv("\t\t\t\tACCESS -> A read from %s was made with size %llu bytes and latency %d ms\n",
-           fromDevice->getName().c_str(), nRecordsRead * Config::RECORD_SIZE,
-           fromDevice->getAccessTimeInMillis(nRecordsRead));
+    printvv("\t\tSTATE -> BG: Read %lld records in RAP\n", nRecordsRead);
+    printvv("\t\tACCESS -> BG: A read from %s was made with size %llu bytes and latency %d ms\n",
+            fromDevice->getName().c_str(), nRecordsRead * Config::RECORD_SIZE,
+            fromDevice->getAccessTimeInMillis(nRecordsRead));
     flushv();
     return nRecordsRead;
 }
@@ -303,11 +303,11 @@ RowCount RunStreamer::readStream(RowCount nRecords, bool firstTime) {
         printv("\t\t\t\tFillingSpace for %lld records in %s\n", count,
                fromDevice->getName().c_str());
         // print access time
-        printv("\t\t\t\tSTATE -> Wrote %lld records to %s using RS\n", count,
-               writerFilename.c_str());
-        printv("\t\t\t\tACCESS -> A write to %s was made with size %llu bytes and latency %d ms\n",
-               fromDevice->getName().c_str(), count * Config::RECORD_SIZE,
-               fromDevice->getAccessTimeInMillis(count));
+        printvv("\t\tSTATE -> BG: Wrote %lld records to %s using RS\n", count,
+                writerFilename.c_str());
+        printvv("\t\tACCESS -> BG: A write to %s was made with size %llu bytes and latency %d ms\n",
+                fromDevice->getName().c_str(), count * Config::RECORD_SIZE,
+                fromDevice->getAccessTimeInMillis(count));
         flushv();
     }
     // free memory

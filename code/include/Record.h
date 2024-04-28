@@ -229,9 +229,7 @@ class RunReader {
         printv("\t\t\t\tDEBUG: RunReader Deleted '%s'\n", filename.c_str());
     }
     bool isDeletedFile() { return _isDeleted; }
-    // Page *readNextPage();
     Record *readNextRecords(RowCount *nRecords) {
-        TRACE(true);
         RowCount nRecordsToRead = *nRecords;
         RowCount nRecordsReadSoFar = 0;
         Record *head = new Record();

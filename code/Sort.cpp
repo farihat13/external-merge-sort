@@ -54,27 +54,6 @@ void SortIterator::getRecord(Record *r) { TRACE(true); } // SortIterator::getRec
 void SortIterator::getPage(Page *p) { TRACE(true); } // SortIterator::getPage
 
 
-// RowCount SortIterator::loadInputToDRAM() {
-//     TRACE(true);
-//     // read records from HDD to DRAM
-//     PageCount nHDDPages = _dramCapacity / _hddPageSize;
-//     RowCount nRecordsToRead = nHDDPages * _hddPageSize;
-//     char *records = _hdd->readRecords(&nRecordsToRead);
-//     if (records == NULL || nRecordsToRead == 0) {
-//         printvv("WARNING: no records read\n");
-//     }
-//     // loading a hdd page to dram
-//     _dram->loadRecordsToDRAM(records, nRecordsToRead);
-//     // print debug information
-//     printv("STATE -> %llu input records read from HDD to DRAM\n", nRecordsToRead);
-//     printv("ACCESS -> A read from HDD to RAM was made with size %llu bytes and latency %d ms\n",
-//            nRecordsToRead * Config::RECORD_SIZE, getHDDAccessTime(nRecordsToRead));
-//     printv("%s\n", _dram->reprUsageDetails().c_str());
-//     flushv();
-
-//     return nRecordsToRead;
-// }
-
 void SortIterator::firstPass() {
     TRACE(true);
 
@@ -84,15 +63,25 @@ void SortIterator::firstPass() {
         exit(EXIT_FAILURE);
     }
 
+    int printStatus = 1;
     _consumed = 0;
     while (true) {
         if (_consumed >= Config::NUM_RECORDS) {
-            printvv("INFO: all records read\n");
+            printv("INFO: all records read\n");
             break;
         }
 
+        int consumedPerc = (int)(((double)_consumed) * 100.0 / Config::NUM_RECORDS);
+        if (consumedPerc > (printStatus * 100.0 / 5.0)) {
+            printvv("\t==> Consumed %d%% input. %llu out of %lld records in input\n", consumedPerc,
+                    _consumed, Config::NUM_RECORDS);
+            flushvv();
+            printStatus++;
+        }
 
-        // 3. Spill some sorted runs to HDD
+        /**
+         * 3. if SSD is full, merge runs in SSD and spill some runs to HDD
+         */
         RowCount nRecordsLeft = Config::NUM_RECORDS - _consumed;
         RowCount _ssdCurrSize = _ssd->getTotalFilledSpaceInRecords();
         RowCount nRecordsNext = std::min(nRecordsLeft, _dramCapacity);
@@ -102,29 +91,32 @@ void SortIterator::firstPass() {
             _ssd->mergeSSDRuns(_hdd);
         }
 
-        // 1. Read records from input file to DRAM
+        /**
+         * 1. Read records from input file to DRAM
+         */
         PageCount nHDDPages = _dramCapacity / _hddPageSize;
         RowCount nRecordsToRead = nHDDPages * _hddPageSize;
         RowCount nRecords = _dram->loadInput(nRecordsToRead);
         if (nRecords == 0) {
-            printvv("WARNING: no records read\n");
+            printv("WARNING: no records read\n");
             break;
         }
         _consumed += nRecords;
-        printvv("DEBUG: consumed %llu out of %llu records in input, input file position %llu\n",
-                _consumed, Config::NUM_RECORDS - _consumed,
-                _hdd->getReadPosition() / Config::RECORD_SIZE);
+        printv("\tconsumed %llu records, left %llu records in input\n", _consumed,
+               Config::NUM_RECORDS - _consumed);
 
-        // 2. Sort records in DRAM
-        _dram->genMiniRuns(nRecords, _ssd); // this should sort records in dram and create miniruns,
-                                            // this should spill runs to SSD and reset dram
+        /**
+         * 2. Sort records in DRAM, create mini-runs, merge mini-runs, store them in SSD and reset
+         * DRAM
+         */
+        _dram->genMiniRuns(nRecords, _ssd);
     }
     _hdd->closeRead(); // close the input file
     _ssd->mergeSSDRuns(_hdd);
 
 #if defined(_VALIDATE)
     // verify the input size and consumed records is same
-    printvv("VALIDATE: input size %llu == consumed %llu\n", Config::NUM_RECORDS, _consumed);
+    printv("VALIDATE: input size %llu == consumed %llu\n", Config::NUM_RECORDS, _consumed);
     flushv();
     assert(_consumed == Config::NUM_RECORDS && "consumed records mismatch");
 #endif
@@ -147,13 +139,16 @@ void SortIterator::externalMergeSort() {
      * 1. First pass: read records from input file to DRAM, sort them, and spill runs to SSD and
      * HDD, and merge runs in SSD
      */
+    printvv("\n========= EXTERNAL_MERGE_SORT START =========\n");
     auto start = std::chrono::steady_clock::now();
     this->firstPass();
     auto endFirstPass = std::chrono::steady_clock::now();
-    auto durFirstPass = std::chrono::duration_cast<std::chrono::minutes>(endFirstPass - start);
-    printvv("INFO: first pass completed in %d ms / %d sec/ %d minutes\n", durFirstPass.count(),
-            durFirstPass.count() / 1000, durFirstPass.count() / (1000 * 60));
-    flushv();
+    auto durFirstPass = std::chrono::duration_cast<std::chrono::seconds>(endFirstPass - start);
+    printvv("\n============= FIRST_PASS COMPLETE ===========\n");
+    printvv("First pass Duration: %lld sec / %lld minutes\n", durFirstPass.count(),
+            durFirstPass.count() / 60);
+    flushvv();
+
     /**
      * 2. Merge all runs in SSD and HDD
      *
@@ -162,8 +157,10 @@ void SortIterator::externalMergeSort() {
     while (true) {
         int nRFilesInSSD = _ssd->getRunfilesCount();
         int nRFilesInHDD = _hdd->getRunfilesCount();
-        printvv("INFO: MERGE_ITR %d: %d runfiles in SSD, %d runfiles in HDD\n", mergeIteration,
+        printvv("\tMERGE_ITR %d: %d runfiles in SSD, %d runfiles in HDD\n", mergeIteration,
                 nRFilesInSSD, nRFilesInHDD);
+        flushvv();
+        auto startMerge = std::chrono::steady_clock::now();
         if (nRFilesInSSD < 0 || nRFilesInHDD < 0) {
             printvv("ERROR: invalid runs in SSD or HDD\n");
             throw std::runtime_error("invalid runs in SSD or HDD");
@@ -197,18 +194,17 @@ void SortIterator::externalMergeSort() {
                 _hdd->mergeHDDRuns();
             }
         }
+        auto endMerge = std::chrono::steady_clock::now();
+        auto durMerge = std::chrono::duration_cast<std::chrono::seconds>(endMerge - startMerge);
+        printvv("\tMERGE_ITR %d COMPLETE: Duration %lld sec / %lld minutes\n", mergeIteration,
+                durMerge.count(), durMerge.count() / 60);
         ++mergeIteration;
     }
-    printvv("SUCCESS: External merge sort complete.\n");
     auto endMerge = std::chrono::steady_clock::now();
-    auto durMerge = std::chrono::duration_cast<std::chrono::minutes>(endMerge - endFirstPass);
-    printvv("INFO: merge completed in %d ms / %d sec/ %d minutes\n", durMerge.count(),
-            durMerge.count() / 1000, durMerge.count() / (1000 * 60));
-
-    printvv("INFO: total run merge iterations %d\n", mergeIteration);
-    auto durTotal = std::chrono::duration_cast<std::chrono::minutes>(endMerge - start);
-    printvv("INFO: total runtime %d ms / %d sec/ %d minutes\n", durTotal.count(),
-            durTotal.count() / 1000, durTotal.count() / (1000 * 60));
-
-    flushv();
+    auto durMerge = std::chrono::duration_cast<std::chrono::seconds>(endMerge - endFirstPass);
+    auto durTotal = std::chrono::duration_cast<std::chrono::seconds>(endMerge - start);
+    printvv("======== EXTERNAL_MERGE_SORT COMPLETE =========\n");
+    printvv("Total Sort Duration %lld sec / %lld minutes\n", durTotal.count(),
+            durTotal.count() / 60);
+    flushvv();
 } // SortIterator::externalMergeSort

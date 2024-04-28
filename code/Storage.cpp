@@ -165,12 +165,12 @@ void Storage::spill(RunWriter *writer) {
     writer->reset();
     // update the storage usage (free up the space in this storage)
     this->freeSpace(nRecord);
-    printv("\t\tSTATE -> %s is full, SPILLED %lld to %s\n", this->name.c_str(), nRecord,
-           spillTo->name.c_str());
-    printv("\t\tACCESS -> A write to %s was made with size %llu bytes and latency %d ms\n",
-           spillTo->getName().c_str(), nRecord * Config::RECORD_SIZE,
-           spillTo->getAccessTimeInMillis(nRecord));
-    flushv();
+    printvv("\t\tSTATE -> %s is full, Spill to %s %lld records\n", this->name.c_str(),
+            spillTo->name.c_str(), nRecord);
+    printvv("\t\tACCESS -> A write to %s was made with size %llu bytes and latency %d ms\n",
+            spillTo->getName().c_str(), nRecord * Config::RECORD_SIZE,
+            spillTo->getAccessTimeInMillis(nRecord));
+    flushvv();
 }
 
 
@@ -213,8 +213,7 @@ RunWriter *Storage::startSpillSession() {
 void Storage::endSpillSession(RunWriter *currDeviceWriter, bool deleteCurrFile) {
     if (spillWriter != nullptr) {
         if (currDeviceWriter != nullptr) {
-            printvv("\t\t\tDEBUG: Spilling leftovers of %s to %s\n", this->name.c_str(),
-                    spillTo->name.c_str());
+            printvv("\t\tSpill to %s leftovers\n", this->name.c_str(), spillTo->name.c_str());
             spill(currDeviceWriter);
             if (deleteCurrFile && (!currDeviceWriter->isDeletedFile())) {
                 this->freeSpace(currDeviceWriter->getCurrSize());

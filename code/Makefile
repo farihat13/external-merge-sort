@@ -1,5 +1,5 @@
 # compiler options
-CPPOPT=-g -Og -D_DEBUG -D_VALIDATE #-D_SMALL #-D_VERIFY #-D_SMALL #-D_USE_LOGFILE #-D_DUP_CHECK #-DUP_GEN
+CPPOPT=-g -Og -D_VALIDATE -D_SMALL #-D_DEBUG #-D_SMALL #-D_VERIFY #-D_SMALL #-D_USE_LOGFILE #-D_DUP_CHECK #-DUP_GEN
 # -O2 -Os -Ofast
 # -fprofile-generate -fprofile-use
 # -fsanitize=address -fsanitize=leak -fsanitize=undefined
@@ -44,7 +44,7 @@ run10G: $(TARGET)
 	./$(TARGET) -c 11000000 -s 1024
 
 run20G: $(TARGET)
-	./$(TARGET) -c 20971520 -s 1024
+	./$(TARGET) -c 22000000 -s 1024
 
 run50G: $(TARGET)
 	./$(TARGET) -c 53000000 -s 1024
