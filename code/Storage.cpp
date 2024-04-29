@@ -109,9 +109,7 @@ Storage::Storage(std::string name, ByteCount capacity, int bandwidth, double lat
 }
 
 void Storage::configure() {
-    // TODO: configure MERGE_FAN_IN and MERGE_FAN_OUT
-
-    // calculate the page size in records
+    // Calculate the page size in records
     ByteCount nBytes = this->BANDWIDTH * this->LATENCY;
     nBytes = RoundUp(nBytes, 4 * 1024); // round up to 4KB
     PAGE_SIZE_IN_RECORDS = nBytes / Config::RECORD_SIZE;

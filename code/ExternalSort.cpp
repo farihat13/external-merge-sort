@@ -80,13 +80,13 @@ void readCmdlineArgs(int argc, char *argv[]) {
  */
 void init() {
 #if defined(_SMALL)
-    Config::DRAM_CAPACITY = 1LL * 5 * 1024 * 1024; // 10 MB
-    Config::SSD_CAPACITY = 1LL * 10 * 1024 * 1024; // 25 MB
-    Config::RECORD_SIZE = 1024;                    // 1024 bytes
-    Config::NUM_RECORDS = 10000;                   // 10000 records
+    Config::DRAM_CAPACITY = 1LL * 3 * 1024 * 1024;   // 5 MB
+    Config::SSD_CAPACITY = 1LL * 1024 * 1024 * 1024; // 1 GB
+    Config::RECORD_SIZE = 1024;                      // 1024 bytes
+    Config::NUM_RECORDS = 800 * 1024;                // 10000 records
     Config::INPUT_FILE = "input-c" + std::to_string(Config::NUM_RECORDS) + "-s" +
                          std::to_string(Config::RECORD_SIZE) + ".txt";
-    Config::VERIFY = true;
+    // Config::VERIFY = true;
     printvv("WARNING: Running in SMALL mode\n");
     flushvv();
 #elif defined(_BIG)
@@ -121,9 +121,29 @@ void init() {
                           std::to_string(minMergeFanIn + minMergeFanOut) + " SSD pages";
         throw std::runtime_error(msg);
     }
+    if (minMergeFanOut * _ssdPageSize > _dram->getMergeFanOutRecords()) {
+        std::string msg =
+            "DRAM merge fan-in is less than " + std::to_string(minMergeFanIn) + " SSD pages";
+        throw std::runtime_error(msg);
+    }
+    if (minMergeFanIn * _ssdPageSize > _dram->getMergeFanInRecords()) {
+        std::string msg =
+            "DRAM merge fan-in is less than " + std::to_string(minMergeFanIn) + " SSD pages";
+        throw std::runtime_error(msg);
+    }
     if ((minMergeFanIn + minMergeFanOut) * _hddPageSize > _ssdCapacity) {
         std::string msg = "SSD capacity is less than " +
                           std::to_string(minMergeFanIn + minMergeFanOut) + " HDD pages";
+        throw std::runtime_error(msg);
+    }
+    if (minMergeFanOut * _hddPageSize > _ssd->getMergeFanOutRecords()) {
+        std::string msg =
+            "SSD merge fan-in is less than " + std::to_string(minMergeFanOut) + " HDD pages";
+        throw std::runtime_error(msg);
+    }
+    if (minMergeFanIn * _hddPageSize > _ssd->getMergeFanInRecords()) {
+        std::string msg =
+            "SSD merge fan-in is less than " + std::to_string(minMergeFanIn) + " HDD pages";
         throw std::runtime_error(msg);
     }
     printvv("Init done\n");
@@ -139,10 +159,10 @@ void cleanup() {
     printv("deleted DRAM\n");
     flushv();
     SSD::deleteInstance();
-    printf("deleted SSD\n");
+    printv("deleted SSD\n");
     flushv();
     HDD::deleteInstance();
-    printf("deleted HDD\n");
+    printv("deleted HDD\n");
     flushv();
     printvv("Cleanup done\n");
 }

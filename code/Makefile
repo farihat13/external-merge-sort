@@ -1,9 +1,8 @@
 # compiler options
-CPPOPT=-g -Og -D_VALIDATE -D_USE_LOGFILE -D_DUP_GEN -D_BIG #-D_DEBUG #-D_SMALL #-D_VERIFY #-D_SMALL #-D_USE_LOGFILE #-D_DUP_CHECK #-DUP_GEN
+CPPOPT=-g -Og -D_VALIDATE -D_DUP_GEN -D_USE_LOGFILE #-D_DEBUG #-D_SMALL #-D_USE_LOGFILE #-D_SMALL #-D_VERIFY #-D_SMALL #-D_USE_LOGFILE #-D_DUP_CHECK #-DUP_GEN
 # -O2 -Os -Ofast
-# -fprofile-generate -fprofile-use
-# -fsanitize=address -fsanitize=leak -fsanitize=undefined
-CPPOPT+=-fsanitize=address -fsanitize=leak -fsanitize=undefined
+# CPPOPT+=--fprofile-generate -fprofile-use
+# CPPOPT+=-fsanitize=address -fsanitize=leak -fsanitize=undefined
 
 # compiler flags
 CPPFLAGS=$(CPPOPT) -Wall -ansi -pedantic -std=c++11 -Iinclude -Wno-reorder

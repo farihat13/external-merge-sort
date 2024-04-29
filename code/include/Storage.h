@@ -82,16 +82,16 @@ class Storage {
     double LATENCY = 0;              // in ms
     // ---- calibrable configurations ----
     RowCount PAGE_SIZE_IN_RECORDS = 0; // in records
-    PageCount CLUSTER_SIZE = 0;        // in pages
-    int MAX_MERGE_FAN_IN = 45;         // #runs to merge at a time, or #input_clusters
+    int MAX_MERGE_FAN_IN = 95;         // #runs to merge at a time, or #input_clusters
     int MAX_MERGE_FAN_OUT = 5;         // #output_clusters
-    RowCount MERGE_FANIN_IN_RECORDS;   // total #records to merge at a time per input cluster
-    RowCount MERGE_FANOUT_IN_RECORDS;  // total #records that can be stored in output clusters
     // ---- read/write buffer ----
     std::string readFilePath;
     std::ifstream readFile;
 
   protected:
+    PageCount CLUSTER_SIZE = 0;       // in pages
+    RowCount MERGE_FANIN_IN_RECORDS;  // total #records to merge at a time per input cluster
+    RowCount MERGE_FANOUT_IN_RECORDS; // total #records that can be stored in output clusters
     // run manager
     RunManager *runManager = nullptr; // only for HDD and SSD
     // ---- internal state ----

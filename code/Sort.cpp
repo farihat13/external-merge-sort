@@ -115,8 +115,10 @@ void SortIterator::firstPass() {
         _dram->genMiniRuns(nRecords, _ssd);
     }
     _hdd->closeRead(); // close the input file
-    // if (_ssd->getRunfilesCount() > 0)
-    // _ssd->mergeSSDRuns(_hdd);
+    if (_ssd->getRunfilesCount() > 0) {
+        // Merge all runs in SSD, expecting the merged run to spill to HDD
+        _ssd->mergeSSDRuns(_hdd);
+    }
 
 #if defined(_VALIDATE)
     // verify the input size and consumed records is same

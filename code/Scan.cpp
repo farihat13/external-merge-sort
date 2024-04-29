@@ -146,6 +146,7 @@ ScanIterator::ScanIterator(ScanPlan const *const plan) : _plan(plan), _count(0) 
     // skip if the input file already exists
     if (!std::ifstream(plan->_filename.c_str())) {
         printvv("========== INPUT_GEN START ========\n");
+        flushvv();
         auto start = std::chrono::steady_clock::now();
         // RowCount n = genInput(plan->_filename, plan->_count);
         RowCount n = genInputBatch(plan->_filename, plan->_count);
