@@ -56,6 +56,14 @@ void SortIterator::getPage(Page *p) { TRACE(true); } // SortIterator::getPage
 
 void SortIterator::firstPass() {
     TRACE(true);
+    if (Config::NUM_RECORDS == 0) {
+        printvv("No records to sort\n");
+        return;
+    }
+    if (Config::NUM_RECORDS == 1) {
+        printvv("Only one record to sort\n");
+        return;
+    }
 
     bool okay = _hdd->readFrom(Config::INPUT_FILE);
     if (!okay) {
@@ -112,7 +120,7 @@ void SortIterator::firstPass() {
         _dram->genMiniRuns(nRecords, _ssd);
     }
     _hdd->closeRead(); // close the input file
-    if (_ssd->getRunfilesCount() > 0) {
+    if (_ssd->getRunfilesCount() > 1) {
         // Merge all runs in SSD, expecting the merged run to spill to HDD
         _ssd->mergeSSDRuns(_hdd);
     }
@@ -158,6 +166,22 @@ void SortIterator::externalMergeSort() {
      */
     int mergeIteration = 0;
     while (true) {
+        if (Config::NUM_RECORDS == 0) {
+            printvv("SUCCESS: No records to merge\n");
+            break;
+        }
+        if (Config::NUM_RECORDS == 1) {
+            printvv("SUCCESS: Only one record to merge\n");
+            // copy the input file to output file
+            std::string src = Config::INPUT_FILE;
+            std::string dest = Config::OUTPUT_FILE;
+            std::ifstream srcFile(src, std::ios::binary);
+            std::ofstream destFile(dest, std::ios::binary);
+            destFile << srcFile.rdbuf();
+            srcFile.close();
+            destFile.close();
+            break;
+        }
         int nRFilesInSSD = _ssd->getRunfilesCount();
         int nRFilesInHDD = _hdd->getRunfilesCount();
         printvv("\tMERGE_ITR %d: %d runfiles in SSD, %d runfiles in HDD\n", mergeIteration,

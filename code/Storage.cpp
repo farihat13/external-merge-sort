@@ -113,24 +113,26 @@ void Storage::configure() {
     ByteCount nBytes = this->BANDWIDTH * this->LATENCY;
     nBytes = RoundUp(nBytes, 4 * 1024); // round up to 4KB
     PAGE_SIZE_IN_RECORDS = nBytes / Config::RECORD_SIZE;
-
-    // calculate a rough cluster size (buffer size per run) in pages
-    RowCount nRecords = CAPACITY_IN_BYTES / Config::RECORD_SIZE;
-    PageCount nPages = nRecords / PAGE_SIZE_IN_RECORDS;
-    CLUSTER_SIZE = nPages / (MAX_MERGE_FAN_IN + MAX_MERGE_FAN_OUT);
-
-    // calculate the merge fan-in and merge fan-out
-    MERGE_FANIN_IN_RECORDS = MAX_MERGE_FAN_IN * CLUSTER_SIZE * PAGE_SIZE_IN_RECORDS;
-    MERGE_FANOUT_IN_RECORDS = getCapacityInRecords() - MERGE_FANIN_IN_RECORDS;
-
-    // print the configurations
     printvv("\tConfigured %s\n", this->name.c_str());
     printvv("\tPage %s\n",
             getSizeDetails(this->PAGE_SIZE_IN_RECORDS * Config::RECORD_SIZE).c_str());
-    printvv("\tCluster Size: %d pages / %s\n", CLUSTER_SIZE,
-            getSizeDetails(CLUSTER_SIZE * PAGE_SIZE_IN_RECORDS * Config::RECORD_SIZE).c_str());
-    printvv("\tInput Buffer Total Size: %llu records\n", this->MERGE_FANIN_IN_RECORDS);
-    printvv("\tOutput Buffer Total Size: %llu records\n", this->MERGE_FANOUT_IN_RECORDS);
+
+    if (this->name != DISK_NAME) {
+        // calculate a rough cluster size (buffer size per run) in pages
+        RowCount nRecords = CAPACITY_IN_BYTES / Config::RECORD_SIZE;
+        PageCount nPages = nRecords / PAGE_SIZE_IN_RECORDS;
+        CLUSTER_SIZE = nPages / (MAX_MERGE_FAN_IN + MAX_MERGE_FAN_OUT);
+
+        // calculate the merge fan-in and merge fan-out
+        MERGE_FANIN_IN_RECORDS = MAX_MERGE_FAN_IN * CLUSTER_SIZE * PAGE_SIZE_IN_RECORDS;
+        MERGE_FANOUT_IN_RECORDS = getCapacityInRecords() - MERGE_FANIN_IN_RECORDS;
+
+        // print the configurations
+        printvv("\tCluster Size: %d pages / %s\n", CLUSTER_SIZE,
+                getSizeDetails(CLUSTER_SIZE * PAGE_SIZE_IN_RECORDS * Config::RECORD_SIZE).c_str());
+        printvv("\tInput Buffer Total Size: %llu records\n", this->MERGE_FANIN_IN_RECORDS);
+        printvv("\tOutput Buffer Total Size: %llu records\n", this->MERGE_FANOUT_IN_RECORDS);
+    }
 }
 
 // ------------------------------- Run Management ------------------------------
@@ -279,13 +281,14 @@ std::string Storage::reprUsageDetails() {
                                            ? "Infinite"
                                            : std::to_string(getCapacityInRecords()) + " records");
     state += "\n\t\t\t\t_filled (with runfiles): " + std::to_string(_filled) + " records";
-    state += "\n\t\t\t\tinputcluster: " + std::to_string(_filledInputClusters) + " out of " +
-             std::to_string(_totalSpaceInInputClusters) + " records";
-    state += ", \n\t\t\t\toutputcluster: " + std::to_string(_filledOutputClusters) + " out of " +
-             std::to_string(_totalSpaceInOutputClusters) + " records";
-    state +=
-        ", \n\t\t\t\tcluster size (inbuf size per run): " + std::to_string(_effectiveClusterSize) +
-        " records";
+    if (this->name != DISK_NAME) {
+        state += "\n\t\t\t\tinputcluster: " + std::to_string(_filledInputClusters) + " out of " +
+                 std::to_string(_totalSpaceInInputClusters) + " records";
+        state += ", \n\t\t\t\toutputcluster: " + std::to_string(_filledOutputClusters) +
+                 " out of " + std::to_string(_totalSpaceInOutputClusters) + " records";
+        state += ", \n\t\t\t\tcluster size (inbuf size per run): " +
+                 std::to_string(_effectiveClusterSize) + " records";
+    }
     state += "\n\t\t\t\ttotal filled: " + std::to_string(getTotalFilledSpaceInRecords()) +
              " out of " + std::to_string(getCapacityInRecords()) + " records";
     state += ", total empty space: " + std::to_string(getTotalEmptySpaceInRecords()) + " records";

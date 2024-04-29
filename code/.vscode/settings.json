@@ -1,0 +1,149 @@
+{
+    "C_Cpp.clang_format_style": "{ BasedOnStyle: LLVM, IndentWidth: 4, TabWidth: 4, ColumnLimit: 100, MaxEmptyLinesToKeep: 2, AllowShortBlocksOnASingleLine: true, AllowShortIfStatementsOnASingleLine: WithoutElse  }",
+    "C_Cpp.clang_format_fallbackStyle": "LLVM",
+    "editor.formatOnSave": true,
+    // add settings to set display tab size to 4 for all files 
+    "editor.tabSize": 4,
+    // force display tab size to 4 for all .cpp and .h files
+    "editor.detectIndentation": false,
+    "todohighlight.keywords": [
+        {
+            "text": "TODO",
+            "color": "red",
+            "backgroundColor": "#F7F799",
+            "overviewRulerColor": "grey"
+        },
+        {
+            "text": "NOTE",
+            "color": "#FFA500",
+            "backgroundColor": "transparent",
+            "overviewRulerColor": "grey"
+        },
+        {
+            "text": "ACCESS ->",
+            "color": "black",
+            "backgroundColor": "skyblue",
+            "overviewRulerColor": "grey"
+        },
+        {
+            "text": "STATE ->",
+            "color": "white",
+            "backgroundColor": "skyblue",
+            "overviewRulerColor": "grey"
+        },
+        {
+            "text": "DEBUG: ",
+            "color": "white",
+            "backgroundColor": "grey",
+            "overviewRulerColor": "grey"
+        },
+        {
+            "text": "INFO: ",
+            "color": "black",
+            "backgroundColor": "yellow",
+            "overviewRulerColor": "grey"
+        },
+        {
+            "text": "FOCUS: ",
+            "color": "orange",
+            "backgroundColor": "yellow",
+            "overviewRulerColor": "grey"
+        },
+        {
+            "text": "ERROR: ",
+            "color": "red",
+            "backgroundColor": "transparent",
+            "overviewRulerColor": "grey"
+        },
+        {
+            "text": "Error: ",
+            "borderRadius": "2px",
+            "color": "orange",
+            "border": "1px solid red",
+            "backgroundColor": "transparent",
+            "overviewRulerColor": "grey"
+        },
+        // {
+        //     "text": "Deleted",
+        //     "color": "blue",
+        //     "backgroundColor": "transparent",
+        //     "overviewRulerColor": "grey"
+        // },
+        {
+            "text": "SUCCESS: ",
+            "color": "white",
+            "backgroundColor": "green",
+            "overviewRulerColor": "grey"
+        },
+        {
+            "text": "VALIDATE: ",
+            "color": "lime",
+            "backgroundColor": "transparent",
+            "overviewRulerColor": "grey"
+        },
+        {
+            "text": "WARNING: ",
+            "color": "red",
+            "backgroundColor": "transparent",
+            "overviewRulerColor": "grey"
+        }
+    ],
+    "files.associations": {
+        "stdexcept": "cpp",
+        "array": "cpp",
+        "atomic": "cpp",
+        "bit": "cpp",
+        "*.tcc": "cpp",
+        "cctype": "cpp",
+        "clocale": "cpp",
+        "cmath": "cpp",
+        "compare": "cpp",
+        "concepts": "cpp",
+        "cstdarg": "cpp",
+        "cstddef": "cpp",
+        "cstdint": "cpp",
+        "cstdio": "cpp",
+        "cstdlib": "cpp",
+        "cstring": "cpp",
+        "ctime": "cpp",
+        "cwchar": "cpp",
+        "cwctype": "cpp",
+        "deque": "cpp",
+        "string": "cpp",
+        "unordered_map": "cpp",
+        "vector": "cpp",
+        "exception": "cpp",
+        "algorithm": "cpp",
+        "functional": "cpp",
+        "iterator": "cpp",
+        "memory": "cpp",
+        "memory_resource": "cpp",
+        "numeric": "cpp",
+        "random": "cpp",
+        "string_view": "cpp",
+        "system_error": "cpp",
+        "tuple": "cpp",
+        "type_traits": "cpp",
+        "utility": "cpp",
+        "fstream": "cpp",
+        "initializer_list": "cpp",
+        "iomanip": "cpp",
+        "iosfwd": "cpp",
+        "iostream": "cpp",
+        "istream": "cpp",
+        "limits": "cpp",
+        "new": "cpp",
+        "numbers": "cpp",
+        "ostream": "cpp",
+        "sstream": "cpp",
+        "streambuf": "cpp",
+        "typeinfo": "cpp",
+        "chrono": "cpp",
+        "codecvt": "cpp",
+        "ratio": "cpp",
+        "semaphore": "cpp",
+        "stop_token": "cpp",
+        "thread": "cpp",
+        "set": "cpp"
+    },
+}

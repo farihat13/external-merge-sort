@@ -1,7 +1,9 @@
 #!/bin/bash
 
-./ExternalSort.exe -c 11000000 -s 1024 -o trace10G &
+# Usage: ./track.sh <output_file>
 
+# Output file for memory usage data
+OUTPUT_FILE=$1
 
 # Make sure to replace this with the actual PID or use pgrep inside the loop
 PID=$(pgrep -f ExternalSort.exe)
@@ -11,9 +13,6 @@ if [ -z "$PID" ]; then
     echo "Process not running."
     exit 1
 fi
-
-# Output file for memory usage data
-OUTPUT_FILE="memcpu_10G.txt"
 
 # Header for output file
 echo "Timestamp, RSS (KB), VSZ (KB), CPU (%)" > $OUTPUT_FILE

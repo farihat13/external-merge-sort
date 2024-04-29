@@ -58,6 +58,10 @@ std::ofstream openWriteFile(const std::string &filePath) {
 
 bool verifyOrder(const std::string &outputFilePath, uint64_t capacityMB) {
     TRACE(true);
+    if (Config::NUM_RECORDS == 0) {
+        printvv("SUCCESS: No records to verify order\n");
+        return true;
+    }
     printvv("============= Verifying order =============\n");
 
     std::ifstream outputFile = openReadFile(outputFilePath);
@@ -117,7 +121,7 @@ bool verifyOrder(const std::string &outputFilePath, uint64_t capacityMB) {
 
 
     if (ordered) {
-        printvv("Order verified with %ld records\n", nRecords);
+        printvv("SUCCESS: Order verified with %ld records\n", nRecords);
         printvv("============= Order verification successful =============\n");
     } else {
         printvv("Order verification failed\n");
@@ -303,6 +307,10 @@ bool compareHashFiles(uint64_t i, const std::string &inputDir, const std::string
 bool verifyIntegrity(const std::string &inputFilePath, const std::string &outputFilePath,
                      uint64_t capacityMB) {
     TRACE(true);
+    if (Config::NUM_RECORDS == 0) {
+        printvv("SUCCESS: No records to verify integrity\n");
+        return true;
+    }
     printvv("============= Verifying integrity =============\n");
 
     // delete existing hash partitioned files

@@ -16,11 +16,11 @@ int Config::DRAM_BANDWIDTH = 100 * 1024 * 1024;            // 100 GB/s
 // ---- SSD ----
 ByteCount Config::SSD_CAPACITY = 10LL * 1024 * 1024 * 1024; // 10GB
 double Config::SSD_LATENCY = 1.0 / (10 * 1000);             // 0.1 ms
-int Config::SSD_BANDWIDTH = 100 * 1024 * 1024;              // 100 MB/s
+int Config::SSD_BANDWIDTH = 200 * 1024 * 1024;              // 200 MB/s
 // SSD buffer size = 10 MB
 // ---- HDD ----
 ByteCount Config::HDD_CAPACITY = INFINITE_CAPACITY * 1LL; // Infinite
-double Config::HDD_LATENCY = 1 * 10.0 / 1000;             // 10 ms
+double Config::HDD_LATENCY = 1 * 5.0 / 1000;              // 5 ms
 int Config::HDD_BANDWIDTH = 100 * 1024 * 1024;            // 100 MB/s
 // ---- Record ----
 int Config::RECORD_KEY_SIZE = 8;          // 8 bytes

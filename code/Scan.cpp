@@ -153,8 +153,7 @@ ScanIterator::ScanIterator(ScanPlan const *const plan) : _plan(plan), _count(0) 
         auto end = std::chrono::steady_clock::now();
         auto dur = std::chrono::duration_cast<std::chrono::seconds>(end - start);
         printvv("======= INPUT_GEN COMPLETE ========\n");
-        printvv("Input_Gen Duration %lld seconds / %lld minutes\n", n, dur.count(),
-                dur.count() / 60);
+        printvv("Input_Gen Duration %lld seconds / %lld minutes\n", dur.count(), dur.count() / 60);
         flushvv();
         if (n != plan->_count) {
             printvv("ERROR: generated %lld records instead of %lld\n", n, plan->_count);

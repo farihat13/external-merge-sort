@@ -450,6 +450,16 @@ void SSD::mergeSSDRuns(HDD *outputDevice) {
         }
     }
 
+    if (_ssd->getRunfilesCount() == 0) {
+        printvv("WARNING: No runs to merge in SSD\n");
+        return;
+    }
+    if (_ssd->getRunfilesCount() == 1) {
+        printvv("WARNING: Only one run in SSD, No need for merge\n");
+        _ssd->freeSpaceBySpillingRunfiles();
+        return;
+    }
+
     /*
      * 2. adjust the fanIn based on the available space in SSD and DRAM
      * and setup the input and output buffer sizes in DRAM

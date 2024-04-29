@@ -5,9 +5,11 @@
 #include "Verify.h"
 #include "config.h"
 #include "defs.h"
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <ctime>
 #include <string>
 
 
@@ -28,6 +30,9 @@
  * @param argv
  */
 void readCmdlineArgs(int argc, char *argv[]) {
+    std::string usage = "Usage: " + std::string(argv[0]) +
+                        " -c <num_records> -s <record_size> -o <trace_file> -v <verify_output> -vo "
+                        "<verify_only> \n";
     if (argc < 2) {
         fprintf(stderr, "Usage: %s -c <num_records> -s <record_size> -o <trace_file>\n", argv[0]);
         exit(1);
@@ -67,11 +72,15 @@ void readCmdlineArgs(int argc, char *argv[]) {
             Config::VERIFY = true;
         } else {
             fprintf(stderr, "Unknown option: %s\n", argv[i]);
+            fprintf(stderr, "Usage: %s -c <num_records> -s <record_size> -o <trace_file>\n",
+                    argv[0]);
             exit(1);
         }
     }
     Config::INPUT_FILE = "input-c" + std::to_string(Config::NUM_RECORDS) + "-s" +
                          std::to_string(Config::RECORD_SIZE) + ".txt";
+    Config::OUTPUT_FILE = "output-c" + std::to_string(Config::NUM_RECORDS) + "-s" +
+                          std::to_string(Config::RECORD_SIZE) + ".txt";
 } // readCmdlineArgs
 
 
@@ -100,6 +109,29 @@ void init() {
     flushvv();
 #endif
     printConfig();
+
+
+    if (Config::RECORD_SIZE < Config::RECORD_KEY_SIZE) {
+        std::string msg = "Error: Record size is less than key size";
+        throw std::runtime_error(msg);
+    }
+
+    // Check if input and output file exists
+    if (Config::VERIFY_ONLY) {
+        if (!std::ifstream(Config::INPUT_FILE.c_str())) {
+            std::string msg =
+                "Error: Verify-only selected. Input file " + Config::INPUT_FILE + " does not exist";
+            throw std::runtime_error(msg);
+        }
+        if (!std::ifstream(Config::OUTPUT_FILE.c_str())) {
+            std::string msg = "Error: Verify-only selected. Output file " + Config::OUTPUT_FILE +
+                              " does not exist";
+            throw std::runtime_error(msg);
+        }
+        printvv("INFO: Verify-only selected\n");
+        flushvv();
+        return;
+    }
 
     HDD *_hdd = HDD::getInstance();
     HDD *_ssd = SSD::getInstance();
@@ -170,13 +202,14 @@ void cleanup() {
 
 int main(int argc, char *argv[]) {
 
-    // read command line arguments
+    // Read command line arguments
     readCmdlineArgs(argc, argv);
 
-    if (!Config::VERIFY_ONLY) {
-        // initialize anything needed
-        init();
+    // Validate the input and initialize the system
+    init();
 
+
+    if (!Config::VERIFY_ONLY) {
         Plan *scanPlan = new ScanPlan(Config::NUM_RECORDS, Config::INPUT_FILE);
         Plan *const plan = new SortPlan(scanPlan);
 
@@ -190,10 +223,26 @@ int main(int argc, char *argv[]) {
         cleanup();
     }
 
+#include <chrono>
+
     if (Config::VERIFY_ONLY || Config::VERIFY) {
         uint64_t capacityMB = 1024; // 1 GB or 1024 memory used for verification
+
+        // Verify the order
+        auto start = std::chrono::steady_clock::now();
         verifyOrder(Config::OUTPUT_FILE, capacityMB);
+        auto end = std::chrono::steady_clock::now();
+        auto dur = std::chrono::duration_cast<std::chrono::seconds>(end - start);
+        printv("Order Verification Duration %lld seconds / %lld minutes\n", dur.count(),
+               dur.count() / 60);
+
+        // Verify the integrity
+        auto startIntegrity = std::chrono::steady_clock::now();
         verifyIntegrity(Config::INPUT_FILE, Config::OUTPUT_FILE, capacityMB);
+        auto endIntegrity = std::chrono::steady_clock::now();
+        dur = std::chrono::duration_cast<std::chrono::seconds>(endIntegrity - startIntegrity);
+        printv("Integrity Verification Duration %lld seconds / %lld minutes\n", dur.count(),
+               dur.count() / 60);
     }
 
     return 0;
