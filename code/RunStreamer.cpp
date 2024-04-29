@@ -160,8 +160,8 @@ RowCount RunStreamer::readAheadPages(PageCount nPages) {
     printv("\t\t\t\tRunStreamer Read %lld records from reader %s, expected %lld records, readSoFar "
            "%lld\n",
            nRecordsRead, reader->getFilename().c_str(), nRecordsToRead, readSoFar);
-    printvv("\t\tSTATE -> BG: Read %lld records in RAP\n", nRecordsRead);
-    printvv("\t\tACCESS -> BG: A read from %s was made with size %llu bytes and latency %d ms\n",
+    printss("\t\tSTATE -> BG: Read %lld records in RAP\n", nRecordsRead);
+    printss("\t\tACCESS -> BG: A read from %s was made with size %llu bytes and latency %d ms\n",
             fromDevice->getName().c_str(), nRecordsRead * Config::RECORD_SIZE,
             fromDevice->getAccessTimeInMillis(nRecordsRead));
     flushv();
@@ -303,9 +303,9 @@ RowCount RunStreamer::readStream(RowCount nRecords, bool firstTime) {
         printv("\t\t\t\tFillingSpace for %lld records in %s\n", count,
                fromDevice->getName().c_str());
         // print access time
-        printvv("\t\tSTATE -> BG: Wrote %lld records to %s using RS\n", count,
+        printss("\t\tSTATE -> BG: Wrote %lld records to %s using RS\n", count,
                 writerFilename.c_str());
-        printvv("\t\tACCESS -> BG: A write to %s was made with size %llu bytes and latency %d ms\n",
+        printss("\t\tACCESS -> BG: A write to %s was made with size %llu bytes and latency %d ms\n",
                 fromDevice->getName().c_str(), count * Config::RECORD_SIZE,
                 fromDevice->getAccessTimeInMillis(count));
         flushv();

@@ -165,9 +165,9 @@ void Storage::spill(RunWriter *writer) {
     writer->reset();
     // update the storage usage (free up the space in this storage)
     this->freeSpace(nRecord);
-    printvv("\t\tSTATE -> %s is full, Spill to %s %lld records\n", this->name.c_str(),
+    printss("\t\tSTATE -> %s is full, Spill to %s %lld records\n", this->name.c_str(),
             spillTo->name.c_str(), nRecord);
-    printvv("\t\tACCESS -> A write to %s was made with size %llu bytes and latency %d ms\n",
+    printss("\t\tACCESS -> A write to %s was made with size %llu bytes and latency %d ms\n",
             spillTo->getName().c_str(), nRecord * Config::RECORD_SIZE,
             spillTo->getAccessTimeInMillis(nRecord));
     flushvv();

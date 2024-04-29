@@ -1,8 +1,9 @@
 # compiler options
-CPPOPT=-g -Og -D_VALIDATE -D_USE_LOGFILE -D_DUP_GEN -D_DEBUG #-D_SMALL #-D_VERIFY #-D_SMALL #-D_USE_LOGFILE #-D_DUP_CHECK #-DUP_GEN
+CPPOPT=-g -Og -D_VALIDATE -D_USE_LOGFILE -D_DUP_GEN -D_BIG #-D_DEBUG #-D_SMALL #-D_VERIFY #-D_SMALL #-D_USE_LOGFILE #-D_DUP_CHECK #-DUP_GEN
 # -O2 -Os -Ofast
 # -fprofile-generate -fprofile-use
 # -fsanitize=address -fsanitize=leak -fsanitize=undefined
+CPPOPT+=-fsanitize=address -fsanitize=leak -fsanitize=undefined
 
 # compiler flags
 CPPFLAGS=$(CPPOPT) -Wall -ansi -pedantic -std=c++11 -Iinclude -Wno-reorder
@@ -41,7 +42,7 @@ run5G: $(TARGET)
 	./$(TARGET) -c 6000000 -s 1024 -v
 
 run10G: $(TARGET)
-	./$(TARGET) -c 11000000 -s 1024 -v
+	./$(TARGET) -c 11000000 -s 1024
 
 run20G: $(TARGET)
 	./$(TARGET) -c 22000000 -s 1024

@@ -145,7 +145,7 @@ void SortIterator::externalMergeSort() {
     auto endFirstPass = std::chrono::steady_clock::now();
     auto durFirstPass = std::chrono::duration_cast<std::chrono::seconds>(endFirstPass - start);
     printvv("============= FIRST_PASS COMPLETE ===========\n");
-    printvv("First pass Duration: %lld sec / %lld minutes\n", durFirstPass.count(),
+    printvv("First_Pass Duration: %lld seconds / %lld minutes\n", durFirstPass.count(),
             durFirstPass.count() / 60);
     flushvv();
 
@@ -196,7 +196,7 @@ void SortIterator::externalMergeSort() {
         }
         auto endMerge = std::chrono::steady_clock::now();
         auto durMerge = std::chrono::duration_cast<std::chrono::seconds>(endMerge - startMerge);
-        printvv("\tMERGE_ITR %d COMPLETE: Duration %lld sec / %lld minutes\n", mergeIteration,
+        printvv("\tMERGE_ITR %d COMPLETE: Duration %lld seconds / %lld minutes\n", mergeIteration,
                 durMerge.count(), durMerge.count() / 60);
         ++mergeIteration;
     }
@@ -204,7 +204,7 @@ void SortIterator::externalMergeSort() {
     auto durMerge = std::chrono::duration_cast<std::chrono::seconds>(endMerge - endFirstPass);
     auto durTotal = std::chrono::duration_cast<std::chrono::seconds>(endMerge - start);
     printvv("======== EXTERNAL_MERGE_SORT COMPLETE =========\n");
-    printvv("Total Sort Duration %lld sec / %lld minutes\n", durTotal.count(),
+    printvv("External_Merge_Sort Total Duration %lld seconds / %lld minutes\n", durTotal.count(),
             durTotal.count() / 60);
     printvv("Removed %lld duplicate records out of %lld duplicates\n",
             Config::NUM_DUPLICATES_REMOVED, Config::NUM_DUPLICATES);

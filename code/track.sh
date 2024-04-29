@@ -1,5 +1,8 @@
 #!/bin/bash
 
+./ExternalSort.exe -c 11000000 -s 1024 -o trace10G &
+
+
 # Make sure to replace this with the actual PID or use pgrep inside the loop
 PID=$(pgrep -f ExternalSort.exe)
 
@@ -34,3 +37,10 @@ while true; do
     # Wait for 1 second (or more depending on how often you want to record)
     sleep 1
 done
+
+./plot.py $OUTPUT_FILE
+
+# Generate a plot from the output file
+gnuplot -persist -e "datafile='$OUTPUT_FILE'" plot_memcpu.gp
+
+# End of script

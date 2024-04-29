@@ -66,7 +66,7 @@ RowCount genInputBatch(const std::string &filename, const RowCount count) {
     // seed is fixed for reproducibility
     srand(100);
 #endif
-    traceprintf("generating input file '%s'\n", filename.c_str());
+    printv("generating input file '%s'\n", filename.c_str());
     std::string tmpfilename = filename + ".tmp";
     std::ofstream input_file(tmpfilename, std::ios::binary | std::ios::trunc);
 
@@ -74,7 +74,7 @@ RowCount genInputBatch(const std::string &filename, const RowCount count) {
      * generate records in batches
      */
     // calculate batch size and number of batches
-    RowCount batchSize = 4096;
+    RowCount batchSize = 4096 * 2;
     batchSize = std::min(batchSize, count);
     if (batchSize % 2 != 0) { batchSize--; }
     RowCount nBatches = batchSize == 0 ? 0 : (count / batchSize);
@@ -145,14 +145,15 @@ ScanIterator::ScanIterator(ScanPlan const *const plan) : _plan(plan), _count(0) 
     TRACE(true);
     // skip if the input file already exists
     if (!std::ifstream(plan->_filename.c_str())) {
-        printvv("========== INPUT_FILE_GEN START ========\n");
+        printvv("========== INPUT_GEN START ========\n");
         auto start = std::chrono::steady_clock::now();
         // RowCount n = genInput(plan->_filename, plan->_count);
         RowCount n = genInputBatch(plan->_filename, plan->_count);
         auto end = std::chrono::steady_clock::now();
         auto dur = std::chrono::duration_cast<std::chrono::seconds>(end - start);
-        printvv("======= INPUT_FILE_GEN COMPLETE ========\n");
-        printvv("Duration %lld seconds / %lld minutes\n", n, dur.count(), dur.count() / 60);
+        printvv("======= INPUT_GEN COMPLETE ========\n");
+        printvv("Input_Gen Duration %lld seconds / %lld minutes\n", n, dur.count(),
+                dur.count() / 60);
         flushvv();
         if (n != plan->_count) {
             printvv("ERROR: generated %lld records instead of %lld\n", n, plan->_count);

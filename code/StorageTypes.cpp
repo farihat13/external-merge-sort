@@ -194,7 +194,7 @@ void HDD::mergeHDDRuns() {
     Record *current = head, *prev = nullptr;
     RowCount nSorted = 0, runningCount = 0;
     RowCount nDups = 0, runningCountWithoutDups = 0;
-    std::vector<Record *> prevs;
+    bool copied = false;
     while (true) {
         Record *winner = loserTree.getNext();
         if (winner == NULL) { break; }
@@ -212,12 +212,16 @@ void HDD::mergeHDDRuns() {
             continue;
         }
         runningCountWithoutDups++;
+        if (copied) {
+            delete prev;
+            copied = false;
+        }
         prev = winner;
         current->next = winner;
         current = current->next;
         if (runningCountWithoutDups >= totalOutBufSizeDram) {
             prev = new Record(prev->data);
-            prevs.push_back(prev);
+            copied = true;
             /**
              * 4.1. when the merged run size fills the output buffer size, store the run in SSD
              */
@@ -230,9 +234,9 @@ void HDD::mergeHDDRuns() {
 #endif
             RowCount nRecord = _ssd->writeNextChunk(writer, merged);
             assert(nRecord == runningCountWithoutDups && "ERROR: Writing run in mergeHDDRuns");
-            printvv("\t\tSTATE -> Merging runs, Spill to %s %lld records\n",
+            printss("\t\tSTATE -> Merging runs, Spill to %s %lld records\n",
                     writer->getFilename().c_str(), runningCountWithoutDups);
-            printvv("\t\tACCESS -> A write to SSD was made with size %llu bytes and "
+            printss("\t\tACCESS -> A write to SSD was made with size %llu bytes and "
                     "latency %d ms\n",
                     runningCount * Config::RECORD_SIZE, getSSDAccessTime(runningCountWithoutDups));
             flushv();
@@ -259,9 +263,9 @@ void HDD::mergeHDDRuns() {
         RowCount nRecord = _ssd->writeNextChunk(writer, merged);
         assert(nRecord == runningCountWithoutDups &&
                "ERROR: Writing remaining run in mergeHDDRuns");
-        printvv("\t\tSTATE -> Merged runs, Spill to %s %lld records\n",
+        printss("\t\tSTATE -> Merged runs, Spill to %s %lld records\n",
                 writer->getFilename().c_str(), runningCountWithoutDups);
-        printvv("\t\tACCESS -> A write to SSD was made with size %llu bytes and latency %d ms\n",
+        printss("\t\tACCESS -> A write to SSD was made with size %llu bytes and latency %d ms\n",
                 runningCountWithoutDups * Config::RECORD_SIZE,
                 getSSDAccessTime(runningCountWithoutDups));
         flushv();
@@ -293,9 +297,6 @@ void HDD::mergeHDDRuns() {
     _dram->reset();
     // free memory
     delete head;
-    for (auto prev : prevs) {
-        delete prev;
-    }
     // for (auto streamer : runStreamers) {
     //     delete streamer;
     // }
@@ -444,7 +445,7 @@ void SSD::mergeSSDRuns(HDD *outputDevice) {
     Record *current = head, *prev = nullptr;
     RowCount nSorted = 0, runningCount = 0;
     RowCount nDups = 0, runningCountWithoutDups = 0;
-    std::vector<Record *> prevs;
+    bool copied = false;
     while (true) {
         Record *winner = loserTree.getNext();
         if (winner == nullptr) { break; }
@@ -459,6 +460,10 @@ void SSD::mergeSSDRuns(HDD *outputDevice) {
             continue;
         }
         runningCountWithoutDups++;
+        if (copied) {
+            delete prev;
+            copied = false;
+        }
         prev = winner;
         current->next = winner;
         current = current->next;
@@ -468,7 +473,7 @@ void SSD::mergeSSDRuns(HDD *outputDevice) {
         }
         if (runningCountWithoutDups >= _totalOutBufSizeDRAM) {
             prev = new Record(prev->data);
-            prevs.push_back(prev);
+            copied = true;
             /**
              * 4.1. when the merged run size fills the DRAM output buffer size, spill the run to
              * SSD; when the SSD output buffer size is filled, spill the run to HDD
@@ -482,9 +487,9 @@ void SSD::mergeSSDRuns(HDD *outputDevice) {
 #endif
             RowCount nRecord = _ssd->writeNextChunk(writer, merged);
             assert(nRecord == runningCountWithoutDups && "ERROR: Writing run during mergeSSDRuns");
-            printvv("\t\tSTATE -> Merging runs, Spill to %s, %lld records \n",
+            printss("\t\tSTATE -> Merging runs, Spill to %s, %lld records \n",
                     writer->getFilename().c_str(), runningCountWithoutDups);
-            printvv(
+            printss(
                 "\t\tACCESS -> A write to SSD was made with size %llu bytes and latency %d ms\n",
                 runningCountWithoutDups * Config::RECORD_SIZE,
                 getSSDAccessTime(runningCountWithoutDups));
@@ -510,9 +515,9 @@ void SSD::mergeSSDRuns(HDD *outputDevice) {
 #endif
         RowCount nRecord = _ssd->writeNextChunk(writer, merged);
         assert(nRecord == runningCountWithoutDups && "ERROR: Writing run during mergeSSDRuns");
-        printvv("\t\tSTATE -> Merged runs, Spill to %s %lld records\n",
+        printss("\t\tSTATE -> Merged runs, Spill to %s %lld records\n",
                 writer->getFilename().c_str(), runningCountWithoutDups);
-        printvv("\t\tACCESS -> A write to SSD was made with size %llu bytes and latency %d ms\n",
+        printss("\t\tACCESS -> A write to SSD was made with size %llu bytes and latency %d ms\n",
                 runningCountWithoutDups * Config::RECORD_SIZE,
                 getSSDAccessTime(runningCountWithoutDups));
         flushv();
@@ -537,12 +542,9 @@ void SSD::mergeSSDRuns(HDD *outputDevice) {
 
     // free memory
     delete head;
-    for (auto prev : prevs) {
-        delete prev;
+    for (auto streamer : runStreamers) { // NOTE: loserTree will delete the streamers
+        delete streamer;
     }
-    // for (auto streamer : runStreamers) { // NOTE: loserTree will delete the streamers
-    //     delete streamer;
-    // }
 
     // final print
     printvv("\tMERGE_SSD_RUNS COMPLETE: Merged %d runs\n", runFiles.size());
@@ -686,8 +688,8 @@ RowCount DRAM::loadInput(RowCount nRecords) {
     _filled += nRecordsRead;
 
     // print debug information
-    printvv("\t\tSTATE -> Read %llu input records\n", nRecordsRead);
-    printvv("\t\tACCESS -> A read from HDD was made with size %llu bytes and latency %d ms\n",
+    printss("\t\tSTATE -> Read %llu input records\n", nRecordsRead);
+    printss("\t\tACCESS -> A read from HDD was made with size %llu bytes and latency %d ms\n",
             nRecordsRead * Config::RECORD_SIZE, getHDDAccessTime(nRecordsRead));
     printv("%s\n", this->reprUsageDetails().c_str());
     flushv();
@@ -776,9 +778,9 @@ void DRAM::genMiniRuns(RowCount nRecords, HDD *outputStorage) {
         }
         _miniruns.erase(_miniruns.begin() + i, _miniruns.end());
 
-        printvv("\t\tSTATE -> %d cache-sized miniruns Spill to %s\n", j - i,
+        printss("\t\tSTATE -> %d cache-sized miniruns Spill to %s\n", j - i,
                 outputStorage->getName().c_str());
-        printvv("\t\tACCESS -> A write to %s was made with size %llu bytes and latency %d ms\n",
+        printss("\t\tACCESS -> A write to %s was made with size %llu bytes and latency %d ms\n",
                 outputStorage->getName().c_str(), spillNRecords * Config::RECORD_SIZE,
                 getSSDAccessTime(spillNRecords));
     } else {
@@ -798,13 +800,13 @@ void DRAM::genMiniRuns(RowCount nRecords, HDD *outputStorage) {
     LoserTree loserTree;
     loserTree.constructTree(runStreamers);
     RunWriter *writer = outputStorage->getRunWriter();
-    printvv("\t\tSTATE -> Merging %d cache-sized miniruns\n", _miniruns.size());
+    printss("\t\tSTATE -> Merging %d cache-sized miniruns\n", _miniruns.size());
     // start merging
     Record *head = new Record();
     Record *current = head, *prev = nullptr;
     RowCount nSorted = 0, runningCount = 0;
     RowCount nDups = 0, runningCountWithoutDups = 0;
-    std::vector<Record *> prevs;
+    bool copied = false;
     while (true) {
         Record *winner = loserTree.getNext();
         if (winner == NULL) { break; }
@@ -823,12 +825,16 @@ void DRAM::genMiniRuns(RowCount nRecords, HDD *outputStorage) {
             continue;
         }
         runningCountWithoutDups++;
+        if (copied) {
+            delete prev;
+            copied = false;
+        }
         prev = winner;
         current->next = winner;
         current = current->next;
         if (runningCountWithoutDups >= _totalSpaceInOutputClusters) {
             prev = new Record(prev->data);
-            prevs.push_back(prev);
+            copied = true;
             /**
              * 4.1. when the merged run size fills the output buffer size, store the run in SSD
              */
@@ -843,7 +849,7 @@ void DRAM::genMiniRuns(RowCount nRecords, HDD *outputStorage) {
 #endif
             RowCount nRecord = outputStorage->writeNextChunk(writer, merged);
             assert(nRecord == runningCountWithoutDups && "ERROR: Writing run in mergeMini");
-            printvv("\t\tACCESS -> A write to %s was made with size %llu bytes and latency %d ms\n",
+            printss("\t\tACCESS -> A write to %s was made with size %llu bytes and latency %d ms\n",
                     outputStorage->getName().c_str(), runningCountWithoutDups * Config::RECORD_SIZE,
                     outputStorage->getAccessTimeInMillis(runningCountWithoutDups));
             // free memory
@@ -869,7 +875,7 @@ void DRAM::genMiniRuns(RowCount nRecords, HDD *outputStorage) {
 #endif
         RowCount nRecord = outputStorage->writeNextChunk(writer, merged);
         assert(nRecord == runningCountWithoutDups && "ERROR: Writing remaining run in mergeMini");
-        printvv("\t\tACCESS -> A write to %s was made with size %llu bytes and latency %d ms\n",
+        printss("\t\tACCESS -> A write to %s was made with size %llu bytes and latency %d ms\n",
                 outputStorage->getName().c_str(), runningCountWithoutDups * Config::RECORD_SIZE,
                 outputStorage->getAccessTimeInMillis(runningCountWithoutDups));
         // free memory
@@ -884,19 +890,10 @@ void DRAM::genMiniRuns(RowCount nRecords, HDD *outputStorage) {
     this->resetMergeState();
 
     // free memory
-    if (head != nullptr) {
-        delete head;
-        head = nullptr;
-    }
+    delete head;
     for (auto runStreamer : runStreamers) {
         delete runStreamer;
     }
-    for (auto prev : prevs) {
-        delete prev;
-    }
-    // // for (auto run : _miniruns) { //??
-    // //     delete run;
-    // // }
 
     // final print
     printvv("\tGEN_MINIRUNS COMPLETE: Merged %lld records and Spill to %s ------\n", nSorted,

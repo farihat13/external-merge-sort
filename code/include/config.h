@@ -121,6 +121,8 @@ void printVerbose(bool vv, char const *const file, int const line, char const *c
                   const char *format, ...);
 void flushVerbose();
 #define printvv(...) printVerbose(false, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+// #define printss(...) printVerbose(false, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define printss(...) ((void)0)
 #define flushvv() flushVerbose()
 #if defined(_DEBUG) || defined(DEBUG)
 // Only define the printv and printvv macros if in a debug build

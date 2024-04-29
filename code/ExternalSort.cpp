@@ -83,11 +83,20 @@ void init() {
     Config::DRAM_CAPACITY = 1LL * 5 * 1024 * 1024; // 10 MB
     Config::SSD_CAPACITY = 1LL * 10 * 1024 * 1024; // 25 MB
     Config::RECORD_SIZE = 1024;                    // 1024 bytes
-    Config::NUM_RECORDS = 10000;                   // 20 records
+    Config::NUM_RECORDS = 10000;                   // 10000 records
     Config::INPUT_FILE = "input-c" + std::to_string(Config::NUM_RECORDS) + "-s" +
                          std::to_string(Config::RECORD_SIZE) + ".txt";
     Config::VERIFY = true;
     printvv("WARNING: Running in SMALL mode\n");
+    flushvv();
+#elif defined(_BIG)
+    Config::SSD_CAPACITY = 20LL * 1024 * 1024 * 1024; // 25 MB
+    Config::RECORD_SIZE = 1024;                       // 1024 bytes
+    Config::NUM_RECORDS = 11000000;                   // 10000 records
+    Config::INPUT_FILE = "input-c" + std::to_string(Config::NUM_RECORDS) + "-s" +
+                         std::to_string(Config::RECORD_SIZE) + ".txt";
+    Config::VERIFY = false;
+    printvv("WARNING: Running in BIG mode\n");
     flushvv();
 #endif
     printConfig();
