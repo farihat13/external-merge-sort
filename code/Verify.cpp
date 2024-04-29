@@ -20,12 +20,11 @@
  *      every input in a input hash file should be in the corresponding output hash file
  */
 
-char *readRecordsFromFile(std::ifstream &file, RowCount nRecordsPerRead, RowCount *nRecordsLoaded) {
-    char *data = new char[nRecordsPerRead * Config::RECORD_SIZE];
+void readRecordsFromFile(std::ifstream &file, RowCount nRecordsPerRead, RowCount *nRecordsLoaded,
+                         char *data) {
     file.read(data, nRecordsPerRead * Config::RECORD_SIZE);
     ByteCount nBytes = file.gcount();
     *nRecordsLoaded = nBytes / Config::RECORD_SIZE;
-    return data;
 }
 
 std::ifstream openReadFile(const std::string &filePath) {
@@ -70,25 +69,24 @@ bool verifyOrder(const std::string &outputFilePath, uint64_t capacityMB) {
     RowCount i = 1;
 
     int comparisonLength = Config::RECORD_KEY_SIZE;
-    char *data = readRecordsFromFile(outputFile, nRecordsPerRead, &nRecordsLoaded);
+    char *data = new char[nRecordsPerRead * Config::RECORD_SIZE];
     char *startData = data;
+
+    readRecordsFromFile(outputFile, nRecordsPerRead, &nRecordsLoaded, data);
     RowCount nRecords = nRecordsLoaded;
 
     // read first record
     char *prevRecord = new char[comparisonLength];
     std::memcpy(prevRecord, data, comparisonLength);
 
-    printvv("Number of records per read: %ld\n", nRecordsLoaded);
     bool ordered = true;
-
     while (ordered) {
         nRecordsLoaded--;
 
         // fetch new data if needed
         if (nRecordsLoaded == 0) {
-            free(startData);
-            data = readRecordsFromFile(outputFile, nRecordsPerRead, &nRecordsLoaded);
-            startData = data;
+            data = startData;
+            readRecordsFromFile(outputFile, nRecordsPerRead, &nRecordsLoaded, data);
             if (data == nullptr || nRecordsLoaded == 0) {
                 printvv("Finished reading output\n");
                 break;
@@ -98,7 +96,7 @@ bool verifyOrder(const std::string &outputFilePath, uint64_t capacityMB) {
             data += Config::RECORD_SIZE;
         }
 
-        Record *record = new Record(data);
+        Record *record = Record::wrapAsRecord(data);
         int compare = std::strncmp(prevRecord, record->data, comparisonLength);
         if (compare > 0) {
             printvv("ERROR: Record %ld is not sorted\n", i);
@@ -111,7 +109,10 @@ bool verifyOrder(const std::string &outputFilePath, uint64_t capacityMB) {
     }
 
     // cleanup
-    if (startData != nullptr) { free(startData); }
+    if (startData != nullptr) {
+        delete startData;
+        delete prevRecord;
+    }
     outputFile.close();
 
 
@@ -151,11 +152,11 @@ void partitionFile(const std::string &inputFilePath, const std::string &hashFile
     }
 
     RowCount nRecordsLoaded = 0;
-    char *data;
+    char *data = new char[nRecordsPerRead * Config::RECORD_SIZE];
 
     // read input file in batches and hash partition it
     while (1) {
-        data = readRecordsFromFile(inputFile, nRecordsPerRead, &nRecordsLoaded);
+        readRecordsFromFile(inputFile, nRecordsPerRead, &nRecordsLoaded, data);
         if (data == nullptr || nRecordsLoaded == 0) { break; }
         printvv("Number of records loaded: %ld\n", nRecordsLoaded);
 
@@ -165,12 +166,12 @@ void partitionFile(const std::string &inputFilePath, const std::string &hashFile
             uint64_t partition = hash % nPartitions;
             outputFiles[partition].write(reinterpret_cast<char *>(&hash),
                                          Config::VERIFY_HASH_BYTES);
-            // free(record);
-            record->data = nullptr;
+            delete record;
         }
-        if (data != nullptr) { free(data); }
         // free(data);
     }
+
+    if (data != nullptr) { delete data; }
 
     for (u_int64_t i = 0; i < nPartitions; i++) {
         outputFiles[i].close();
@@ -355,6 +356,7 @@ bool verifyIntegrity(const std::string &inputFilePath, const std::string &output
         printvv("ERROR: Integrity verification failed\n");
         printvv("============= Integrity verification failed =============\n");
     }
+    flushvv();
     // cleanup
     cleanDirectory(inputDir);
     cleanDirectory(outputDir);

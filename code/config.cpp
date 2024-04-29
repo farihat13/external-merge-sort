@@ -256,3 +256,14 @@ std::string getSizeDetails(ByteCount bytes) {
        << megabytes << " MB";
     return ss.str();
 }
+
+void prettyPrintPercentage(double perc) {
+    int i = 0;
+    for (; i < perc; ++i) // consumed
+        printvv("=");
+    printvv(">");
+    for (; i < 100; i++) // remaining
+        printvv(".");
+    printvv("\n");
+    flushvv();
+}

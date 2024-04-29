@@ -195,8 +195,6 @@ int main(int argc, char *argv[]) {
         verifyOrder(Config::OUTPUT_FILE, capacityMB);
         verifyIntegrity(Config::INPUT_FILE, Config::OUTPUT_FILE, capacityMB);
     }
-    return 0;
-
 
     return 0;
 } // main

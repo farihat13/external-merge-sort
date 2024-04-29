@@ -71,14 +71,11 @@ void SortIterator::firstPass() {
             break;
         }
 
-        int consumedPerc = (int)(((double)_consumed) * 100.0 / Config::NUM_RECORDS);
-        if (consumedPerc > (printStatus * 100.0 / 5.0)) {
-            printvv("\tConsumed %d%% input. %llu out of %lld records in input\n\t", consumedPerc,
+        double consumedPerc = ((double)_consumed) * 100.0 / Config::NUM_RECORDS;
+        if (consumedPerc > printStatus * 1.0) {
+            printvv("\tConsumed %.1lf%% input. %llu out of %lld records.\n\t", consumedPerc,
                     _consumed, Config::NUM_RECORDS);
-            for (int i = 0; i < printStatus; ++i)
-                printvv("==");
-            printvv(">\n");
-            flushvv();
+            prettyPrintPercentage(consumedPerc);
             printStatus++;
         }
 

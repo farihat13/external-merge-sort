@@ -139,6 +139,6 @@ void flushVerbose();
 
 ByteCount getFileSize(const std::string &filename);
 std::string getSizeDetails(ByteCount size);
-
+void prettyPrintPercentage(double perc);
 
 #endif // _CONFIG_H_

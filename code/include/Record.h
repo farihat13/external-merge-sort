@@ -18,6 +18,18 @@
 
 
 class Record {
+  private:
+    Record(bool allocMemory) {
+        if (allocMemory) {
+            data = new char[Config::RECORD_SIZE];
+            data[0] = '!';  // mark the record as invalid
+            data[1] = '\0'; // null terminate the string
+        } else {
+            data = nullptr;
+        }
+        next = nullptr;
+    }
+
   public:
     char *data;
     Record *next = nullptr;
@@ -43,6 +55,16 @@ class Record {
             data = nullptr;
             next = nullptr;
         }
+    }
+    /**
+     * @brief Construct a new Record object, without allocating memory
+     * Used for wrapping existing data, without copying
+     * Used in verifying the output file
+     */
+    static Record *wrapAsRecord(char *data) {
+        Record *rec = new Record(false);
+        rec->data = data;
+        return rec;
     }
 
     // default comparison based on first 8 bytes of data
