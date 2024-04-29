@@ -35,12 +35,10 @@ while true; do
     echo "$TIMESTAMP, $USAGE_DATA" >> $OUTPUT_FILE
 
     # Wait for 1 second (or more depending on how often you want to record)
-    sleep 1
+    sleep 0.5
 done
 
-./plot.py $OUTPUT_FILE
-
 # Generate a plot from the output file
-gnuplot -persist -e "datafile='$OUTPUT_FILE'" plot_memcpu.gp
+./plot.py $OUTPUT_FILE
 
 # End of script

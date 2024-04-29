@@ -95,45 +95,44 @@ std::vector<std::pair<std::string, RowCount>> &RunManager::getStoredRunsSortedBy
 Storage::Storage(std::string name, ByteCount capacity, int bandwidth, double latency)
     : name(name), CAPACITY_IN_BYTES(capacity), BANDWIDTH(bandwidth), LATENCY(latency) {
 
-    printv("INFO: Storage %s\n", name.c_str());
+    printvv("Storage %s\n", name.c_str());
     if (CAPACITY_IN_BYTES == INFINITE_CAPACITY) {
-        printv("\tCapacity: Infinite\n");
+        printvv("\tCapacity: Infinite\n");
     } else {
-        printv("\tCapacity %s\n", getSizeDetails(CAPACITY_IN_BYTES).c_str());
+        printvv("\tCapacity %s\n", getSizeDetails(CAPACITY_IN_BYTES).c_str());
     }
-    printv("\tBandwidth %d MB/s, Latency %3.1lf ms\n", BYTE_TO_MB(BANDWIDTH), SEC_TO_MS(LATENCY));
+    printvv("\tBandwidth %d MB/s, Latency %3.1lf ms\n", BYTE_TO_MB(BANDWIDTH), SEC_TO_MS(LATENCY));
 
     this->configure();
     if (this->name != DRAM_NAME) { this->runManager = new RunManager(this->name); }
+    flushvv();
 }
 
 void Storage::configure() {
     // TODO: configure MERGE_FAN_IN and MERGE_FAN_OUT
 
     // calculate the page size in records
-    int nBytes = this->BANDWIDTH * this->LATENCY;
-    nBytes = ROUNDUP_4K(nBytes);
-    this->PAGE_SIZE_IN_RECORDS = ceil(nBytes / Config::RECORD_SIZE);
+    ByteCount nBytes = this->BANDWIDTH * this->LATENCY;
+    nBytes = RoundUp(nBytes, 4 * 1024); // round up to 4KB
+    PAGE_SIZE_IN_RECORDS = nBytes / Config::RECORD_SIZE;
 
-    // calculate the cluster size in pages
-    int nRecords = this->CAPACITY_IN_BYTES / Config::RECORD_SIZE;
-    int nPages = nRecords / this->PAGE_SIZE_IN_RECORDS;
-    this->CLUSTER_SIZE = nPages / (this->MAX_MERGE_FAN_IN + this->MAX_MERGE_FAN_OUT);
+    // calculate a rough cluster size (buffer size per run) in pages
+    RowCount nRecords = CAPACITY_IN_BYTES / Config::RECORD_SIZE;
+    PageCount nPages = nRecords / PAGE_SIZE_IN_RECORDS;
+    CLUSTER_SIZE = nPages / (MAX_MERGE_FAN_IN + MAX_MERGE_FAN_OUT);
 
     // calculate the merge fan-in and merge fan-out
-    this->MERGE_FANIN_IN_RECORDS =
-        this->MAX_MERGE_FAN_IN * this->CLUSTER_SIZE * this->PAGE_SIZE_IN_RECORDS;
-    this->MERGE_FANOUT_IN_RECORDS = getCapacityInRecords() - this->MERGE_FANIN_IN_RECORDS;
+    MERGE_FANIN_IN_RECORDS = MAX_MERGE_FAN_IN * CLUSTER_SIZE * PAGE_SIZE_IN_RECORDS;
+    MERGE_FANOUT_IN_RECORDS = getCapacityInRecords() - MERGE_FANIN_IN_RECORDS;
 
     // print the configurations
-    printv("\tINFO: Configured %s\n", this->name.c_str());
-    printv("\t\tPage %s\n",
-           getSizeDetails(this->PAGE_SIZE_IN_RECORDS * Config::RECORD_SIZE).c_str());
-    printv("\t\tCluster Size: %d pages / %s\n", this->CLUSTER_SIZE,
-           getSizeDetails(this->CLUSTER_SIZE * this->PAGE_SIZE_IN_RECORDS * Config::RECORD_SIZE)
-               .c_str());
-    printv("\t\t_mergeFanIn: %llu records\n", this->MERGE_FANIN_IN_RECORDS);
-    printv("\t\t_mergeFanOut: %llu records\n", this->MERGE_FANOUT_IN_RECORDS);
+    printvv("\tConfigured %s\n", this->name.c_str());
+    printvv("\tPage %s\n",
+            getSizeDetails(this->PAGE_SIZE_IN_RECORDS * Config::RECORD_SIZE).c_str());
+    printvv("\tCluster Size: %d pages / %s\n", CLUSTER_SIZE,
+            getSizeDetails(CLUSTER_SIZE * PAGE_SIZE_IN_RECORDS * Config::RECORD_SIZE).c_str());
+    printvv("\tInput Buffer Total Size: %llu records\n", this->MERGE_FANIN_IN_RECORDS);
+    printvv("\tOutput Buffer Total Size: %llu records\n", this->MERGE_FANOUT_IN_RECORDS);
 }
 
 // ------------------------------- Run Management ------------------------------

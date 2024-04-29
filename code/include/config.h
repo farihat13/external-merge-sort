@@ -18,9 +18,6 @@
 #include <vector>
 
 
-// #define ROUNDUP(x, byY) (((x) + (byY - 1)) & ~(byY - 1))
-// #define ROUNDDOWN(x, byY) ((x) & ~(byY - 1))
-#define ROUNDUP_4K(x) (((x) + 4095) & ~4095)
 #define BYTE_TO_KB(x) ((x) / 1024)
 #define BYTE_TO_MB(x) ((x) / (1024 * 1024))
 #define BYTE_TO_GB(x) ((x) / (1024 * 1024 * 1024))

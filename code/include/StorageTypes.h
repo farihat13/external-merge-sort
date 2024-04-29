@@ -75,6 +75,7 @@ class SSD : public HDD {
         }
     }
     void setupMergeState(RowCount outputDevicePageSize, int fanIn);
+    void freeSpaceBySpillingRunfiles();
     void mergeSSDRuns(HDD *outputDevice);
 };
 

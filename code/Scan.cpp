@@ -41,7 +41,7 @@ RowCount genInput(const std::string &filename, const RowCount count) {
     srand(time(0));
 #if defined(_DEBUG)
     // seed is fixed for reproducibility
-    // srand(100);
+    srand(100);
 #endif
     traceprintf("generating input file '%s'\n", filename.c_str());
     std::string tmpfilename = filename + ".tmp";

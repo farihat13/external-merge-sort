@@ -100,10 +100,33 @@ void init() {
     flushvv();
 #endif
     printConfig();
-    HDD::getInstance();
-    SSD::getInstance();
-    DRAM::getInstance();
-    printf("init done\n");
+
+    HDD *_hdd = HDD::getInstance();
+    HDD *_ssd = SSD::getInstance();
+    DRAM *_dram = DRAM::getInstance();
+    RowCount _ssdPageSize = _ssd->getPageSizeInRecords();
+    RowCount _dramCapacity = _dram->getCapacityInRecords();
+    RowCount _hddPageSize = _hdd->getPageSizeInRecords();
+    RowCount _ssdCapacity = _ssd->getCapacityInRecords();
+
+    /*
+    Assuming, minMergeFanIn = 4, minMergeFanOut = 2;
+    DRAM capacity should be able to hold at least 4 ssd pages;
+    SSD capacity should be able to hold at least 4 hdd pages
+    */
+    int minMergeFanIn = 2;
+    int minMergeFanOut = 2;
+    if ((minMergeFanIn + minMergeFanOut) * _ssdPageSize > _dramCapacity) {
+        std::string msg = "DRAM capacity is less than " +
+                          std::to_string(minMergeFanIn + minMergeFanOut) + " SSD pages";
+        throw std::runtime_error(msg);
+    }
+    if ((minMergeFanIn + minMergeFanOut) * _hddPageSize > _ssdCapacity) {
+        std::string msg = "SSD capacity is less than " +
+                          std::to_string(minMergeFanIn + minMergeFanOut) + " HDD pages";
+        throw std::runtime_error(msg);
+    }
+    printvv("Init done\n");
 }
 
 
@@ -121,7 +144,7 @@ void cleanup() {
     HDD::deleteInstance();
     printf("deleted HDD\n");
     flushv();
-    printf("cleanup done\n");
+    printvv("Cleanup done\n");
 }
 
 

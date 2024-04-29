@@ -67,14 +67,17 @@ void SortIterator::firstPass() {
     _consumed = 0;
     while (true) {
         if (_consumed >= Config::NUM_RECORDS) {
-            printv("INFO: all records read\n");
+            printvv("All input records read\n");
             break;
         }
 
         int consumedPerc = (int)(((double)_consumed) * 100.0 / Config::NUM_RECORDS);
         if (consumedPerc > (printStatus * 100.0 / 5.0)) {
-            printvv("\t==> Consumed %d%% input. %llu out of %lld records in input\n", consumedPerc,
+            printvv("\tConsumed %d%% input. %llu out of %lld records in input\n\t", consumedPerc,
                     _consumed, Config::NUM_RECORDS);
+            for (int i = 0; i < printStatus; ++i)
+                printvv("==");
+            printvv(">\n");
             flushvv();
             printStatus++;
         }
@@ -94,7 +97,8 @@ void SortIterator::firstPass() {
          * 1. Read records from input file to DRAM
          */
         PageCount nHDDPages = _dramCapacity / _hddPageSize;
-        RowCount nRecordsToRead = nHDDPages * _hddPageSize;
+        RowCount nRecordsToRead = nHDDPages == 0 ? _dramCapacity : nHDDPages * _hddPageSize;
+        nRecordsToRead = std::min(nRecordsToRead, nRecordsLeft);
         RowCount nRecords = _dram->loadInput(nRecordsToRead);
         if (nRecords == 0) {
             printv("WARNING: no records read\n");
@@ -208,5 +212,6 @@ void SortIterator::externalMergeSort() {
             durTotal.count() / 60);
     printvv("Removed %lld duplicate records out of %lld duplicates\n",
             Config::NUM_DUPLICATES_REMOVED, Config::NUM_DUPLICATES);
+    printvv("===============================================\n");
     flushvv();
 } // SortIterator::externalMergeSort

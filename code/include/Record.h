@@ -28,6 +28,8 @@ class Record {
      */
     Record() {
         data = new char[Config::RECORD_SIZE];
+        data[0] = '!';  // mark the record as invalid
+        data[1] = '\0'; // null terminate the string
         next = nullptr;
     }
     Record(char *data) {
@@ -39,6 +41,7 @@ class Record {
         if (data != nullptr) {
             delete[] data;
             data = nullptr;
+            next = nullptr;
         }
     }
 
@@ -82,8 +85,9 @@ class Run {
   public:
     Run(Record *head, RowCount size) : runHead(head), size(size) {}
     ~Run() {
-        printv("\t\t\t\tRun destroying\n");
-        flushv();
+        // printvv("\t\t\tRun destroying: head %s\n",
+        //         (runHead == nullptr ? "NULL" : runHead->reprKey()));
+        flushvv();
         Record *curr = runHead;
         RowCount i = 0;
         while (curr != nullptr && i < size) {
@@ -92,8 +96,8 @@ class Run {
             i++;
             curr = next;
         }
-        printv("\t\t\t\tRun destroyed, Deleted %lld out of %lld records\n", i, size);
-        flushv();
+        // printvv("\t\t\tRun destroyed, Deleted %lld out of %lld records\n", i, size);
+        flushvv();
     }
 
     // getters
@@ -117,26 +121,21 @@ class Run {
     }
 
     bool isSorted() {
-        Record *curr = runHead;
+        Record *curr = runHead, *prev = nullptr;
         RowCount i = 0;
-        while (curr != nullptr && curr->next != nullptr) {
-            if (*curr > *(curr->next)) {
-                printv("ERROR: Run is not sorted %s > %s\n", curr->reprKey(),
-                       curr->next->reprKey());
+        for (; i < this->size; i++) {
+            if (curr == nullptr) {
+                printv("ERROR: Run size %lld, expected %lld\n", i, size);
                 flushv();
                 return false;
             }
-            curr = curr->next;
-            i++;
-            if (i >= size - 1) {
-                i++;
-                break;
+            if (prev != nullptr && *prev > *curr) {
+                printv("ERROR: Run is not sorted %s > %s\n", prev->reprKey(), curr->reprKey());
+                flushv();
+                return false;
             }
-        }
-        if (i != size) {
-            printv("ERROR: Run size %lld is less than expected %lld\n", i, size);
-            flushv();
-            return false;
+            prev = curr;
+            curr = curr->next;
         }
         return true;
     }

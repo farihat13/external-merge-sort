@@ -209,6 +209,9 @@ void HDD::mergeHDDRuns() {
             // printv("FOCUS: Duplicate record found %s %s\n", prev->reprKey(), winner->reprKey());
             nDups++;
             Config::NUM_DUPLICATES_REMOVED++;
+            // free memory
+            delete winner;
+            // move to next record
             continue;
         }
         runningCountWithoutDups++;
@@ -363,6 +366,27 @@ void SSD::setupMergeState(RowCount outputDevicePageSize, int fanIn) {
 }
 
 
+void SSD::freeSpaceBySpillingRunfiles() {
+    while (this->_filled > this->getMergeFanInRecords()) {
+        // get the run file with the largest size
+        auto runFile = this->runManager->getStoredRunsSortedBySize().back();
+        std::string runFilename = runFile.first;
+        RowCount runSize = runFile.second;
+        printvv("\tMoving large run %s (%lld records) to HDD\n", runFilename.c_str(), runSize);
+
+        // move the run file to HDD
+        RunWriter *writer = spillTo->getRunWriter();
+        writer->writeFromFile(runFilename, runSize);
+        spillTo->addRunFile(writer->getFilename(), runSize);
+        writer->close();
+        delete writer;
+
+        // free the space in SSD
+        this->freeSpace(runSize);
+        this->runManager->removeRunFile(runFilename);
+    }
+}
+
 /**
  * assumption: this function is called during the first pass of the sort
  * after this call, all the runs in the SSD will be merged and stored in HDD
@@ -380,12 +404,12 @@ void SSD::mergeSSDRuns(HDD *outputDevice) {
      */
     assert(_ssd->runManager->getTotalRecords() == _ssd->_filled);
     if (_ssd->_filled > _ssd->getMergeFanInRecords()) {
-        // TODO: transfer the runs to HDD
-        std::string msg = "ERROR: Runs occupy " + std::to_string(_ssd->_filled) +
-                          " records, exceeds merge fan-in" +
-                          std::to_string(_ssd->getMergeFanInRecords());
-        printvv("%s\n", msg.c_str());
-        throw std::runtime_error(msg);
+        _ssd->freeSpaceBySpillingRunfiles();
+        if (_ssd->_filled > _ssd->getMergeFanInRecords()) {
+            std ::string msg = "ERROR: SSD should have enough space for Input Buffers\n";
+            printvv("%s\n", msg.c_str());
+            throw std::runtime_error(msg);
+        }
     }
 
     // get configuration parameters
@@ -397,6 +421,7 @@ void SSD::mergeSSDRuns(HDD *outputDevice) {
      */
     int fanIn = runFiles.size();
     if ((fanIn + 1) * _ssdPageSize > _dram->getCapacityInRecords()) {
+        // TODO: avoid this during config
         std::string msg = "ERROR: fanIn " + std::to_string(fanIn) + " exceeds capacity " +
                           std::to_string(_dram->getCapacityInRecords()) + " of DRAM";
         printvv("%s\n", msg.c_str());
@@ -457,6 +482,9 @@ void SSD::mergeSSDRuns(HDD *outputDevice) {
             // printv("FOCUS: Duplicate record found %s %s\n", prev->reprKey(), winner->reprKey());
             nDups++;
             Config::NUM_DUPLICATES_REMOVED++;
+            // free memory
+            delete winner;
+            // move to next record
             continue;
         }
         runningCountWithoutDups++;
@@ -688,7 +716,7 @@ RowCount DRAM::loadInput(RowCount nRecords) {
     _filled += nRecordsRead;
 
     // print debug information
-    printss("\t\tSTATE -> Read %llu input records\n", nRecordsRead);
+    printss("\t\tSTATE -> LOAD_INPUT: %llu input records\n", nRecordsRead);
     printss("\t\tACCESS -> A read from HDD was made with size %llu bytes and latency %d ms\n",
             nRecordsRead * Config::RECORD_SIZE, getHDDAccessTime(nRecordsRead));
     printv("%s\n", this->reprUsageDetails().c_str());
@@ -822,6 +850,9 @@ void DRAM::genMiniRuns(RowCount nRecords, HDD *outputStorage) {
             // printv("FOCUS: Duplicate record found %s %s\n", prev->reprKey(), winner->reprKey());
             nDups++;
             Config::NUM_DUPLICATES_REMOVED++;
+            // free memory
+            delete winner;
+            // move to next record
             continue;
         }
         runningCountWithoutDups++;
@@ -853,6 +884,7 @@ void DRAM::genMiniRuns(RowCount nRecords, HDD *outputStorage) {
                     outputStorage->getName().c_str(), runningCountWithoutDups * Config::RECORD_SIZE,
                     outputStorage->getAccessTimeInMillis(runningCountWithoutDups));
             // free memory
+            // printvv("FOCUS: Freeing memory during merge after writing to SSD\n");
             delete merged;
             // reset the head
             head->next = nullptr;
@@ -879,6 +911,7 @@ void DRAM::genMiniRuns(RowCount nRecords, HDD *outputStorage) {
                 outputStorage->getName().c_str(), runningCountWithoutDups * Config::RECORD_SIZE,
                 outputStorage->getAccessTimeInMillis(runningCountWithoutDups));
         // free memory
+        // printvv("FOCUS: Freeing memory after merge after writing to SSD\n");
         delete merged;
     }
     outputStorage->closeWriter(writer);
@@ -896,7 +929,7 @@ void DRAM::genMiniRuns(RowCount nRecords, HDD *outputStorage) {
     }
 
     // final print
-    printvv("\tGEN_MINIRUNS COMPLETE: Merged %lld records and Spill to %s ------\n", nSorted,
+    printvv("\tGEN_MINIRUNS COMPLETE: Merged %lld records and Spill to %s\n", nSorted,
             outputStorage->getName().c_str());
     if (nDups > 0) { printvv("\tRemoved %lld duplicates\n", nDups); }
     flushvv();
