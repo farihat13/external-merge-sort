@@ -20,12 +20,11 @@
  *      every input in a input hash file should be in the corresponding output hash file
  */
 
-char *readRecordsFromFile(std::ifstream &file, RowCount nRecordsPerRead, RowCount *nRecordsLoaded) {
-    char *data = new char[nRecordsPerRead * Config::RECORD_SIZE];
+void readRecordsFromFile(std::ifstream &file, RowCount nRecordsPerRead, RowCount *nRecordsLoaded,
+                         char *data) {
     file.read(data, nRecordsPerRead * Config::RECORD_SIZE);
     ByteCount nBytes = file.gcount();
     *nRecordsLoaded = nBytes / Config::RECORD_SIZE;
-    return data;
 }
 
 std::ifstream openReadFile(const std::string &filePath) {
@@ -70,15 +69,16 @@ bool verifyOrder(const std::string &outputFilePath, uint64_t capacityMB) {
     RowCount i = 1;
 
     int comparisonLength = Config::RECORD_KEY_SIZE;
-    char *data = readRecordsFromFile(outputFile, nRecordsPerRead, &nRecordsLoaded);
+    char *data = new char[nRecordsPerRead * Config::RECORD_SIZE];
     char *startData = data;
+
+    readRecordsFromFile(outputFile, nRecordsPerRead, &nRecordsLoaded, data);
     RowCount nRecords = nRecordsLoaded;
 
     // read first record
     char *prevRecord = new char[comparisonLength];
     std::memcpy(prevRecord, data, comparisonLength);
 
-    printvv("Number of records per read: %ld\n", nRecordsLoaded);
     bool ordered = true;
 
     while (ordered) {
@@ -86,9 +86,8 @@ bool verifyOrder(const std::string &outputFilePath, uint64_t capacityMB) {
 
         // fetch new data if needed
         if (nRecordsLoaded == 0) {
-            free(startData);
-            data = readRecordsFromFile(outputFile, nRecordsPerRead, &nRecordsLoaded);
-            startData = data;
+            data = startData;
+            readRecordsFromFile(outputFile, nRecordsPerRead, &nRecordsLoaded, data);
             if (data == nullptr || nRecordsLoaded == 0) {
                 printvv("Finished reading output\n");
                 break;
@@ -108,10 +107,13 @@ bool verifyOrder(const std::string &outputFilePath, uint64_t capacityMB) {
 
         i += 1;
         std::memcpy(prevRecord, record->data, comparisonLength);
+        delete record;
     }
 
     // cleanup
-    if (startData != nullptr) { free(startData); }
+    if (startData != nullptr) {
+        delete startData;
+    }
     outputFile.close();
 
 
@@ -151,12 +153,14 @@ void partitionFile(const std::string &inputFilePath, const std::string &hashFile
     }
 
     RowCount nRecordsLoaded = 0;
-    char *data;
+    char *data = new char[nRecordsPerRead * Config::RECORD_SIZE];
 
     // read input file in batches and hash partition it
     while (1) {
-        data = readRecordsFromFile(inputFile, nRecordsPerRead, &nRecordsLoaded);
-        if (data == nullptr || nRecordsLoaded == 0) { break; }
+        readRecordsFromFile(inputFile, nRecordsPerRead, &nRecordsLoaded, data);
+        if (data == nullptr || nRecordsLoaded == 0) {
+            break;
+        }
         printvv("Number of records loaded: %ld\n", nRecordsLoaded);
 
         for (RowCount i = 0; i < nRecordsLoaded; i++) {
@@ -165,11 +169,13 @@ void partitionFile(const std::string &inputFilePath, const std::string &hashFile
             uint64_t partition = hash % nPartitions;
             outputFiles[partition].write(reinterpret_cast<char *>(&hash),
                                          Config::VERIFY_HASH_BYTES);
-            // free(record);
-            record->data = nullptr;
+            delete record;
         }
-        if (data != nullptr) { free(data); }
         // free(data);
+    }
+
+    if (data != nullptr) {
+        delete data;
     }
 
     for (u_int64_t i = 0; i < nPartitions; i++) {
@@ -204,10 +210,14 @@ void cleanDirectory(const std::string &dirPath) {
     // remove directory and create again
     std::string command = "rm -rf " + dirPath;
     int code = system(command.c_str());
-    if (code == -1) { printvv("ERROR: Failed to remove directory '%s'\n", dirPath.c_str()); }
+    if (code == -1) {
+        printvv("ERROR: Failed to remove directory '%s'\n", dirPath.c_str());
+    }
     command = "mkdir -p " + dirPath;
     code = system(command.c_str());
-    if (code == -1) { printvv("ERROR: Failed to create directory '%s'\n", dirPath.c_str()); }
+    if (code == -1) {
+        printvv("ERROR: Failed to create directory '%s'\n", dirPath.c_str());
+    }
 }
 
 
@@ -252,7 +262,9 @@ bool compareHashFiles(uint64_t i, const std::string &inputDir, const std::string
     bool integrity = true;
 
     // check if exists
-    if (!inputPartition.is_open() && !outputPartition.is_open()) { return true; }
+    if (!inputPartition.is_open() && !outputPartition.is_open()) {
+        return true;
+    }
     if (!inputPartition.is_open()) {
         printvv("ERROR: Failed to open input partition file '%s'\n", inputFilePath.c_str());
         outputPartition.close();
