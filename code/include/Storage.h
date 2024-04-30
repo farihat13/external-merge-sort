@@ -176,6 +176,11 @@ class Storage {
 
     // ----------------------------- time calculations -------------------------
     double getAccessTimeInSec(RowCount nRecords) const {
+        if (this->name == SSD_NAME) {
+            Config::SSD_COUNT++;
+        } else if (this->name == DISK_NAME) {
+            Config::HDD_COUNT++;
+        }
         return this->LATENCY + (nRecords * Config::RECORD_SIZE) / this->BANDWIDTH;
     }
     double getAccessTimeInMicro(RowCount nRecords) const {
@@ -274,9 +279,7 @@ class Storage {
         runManager->addRunFile(filename, nRecords);
     }
     std::string getBaseDir() {
-        if (runManager == nullptr) {
-            return "";
-        }
+        if (runManager == nullptr) { return ""; }
         return runManager->getBaseDir();
     }
     // ---- spill session ----
@@ -284,15 +287,11 @@ class Storage {
     RunWriter *startSpillSession();
     void endSpillSession(RunWriter *writer, bool deleteCurrFile = false);
     int getRunfilesCount() {
-        if (runManager == nullptr) {
-            return 0;
-        }
+        if (runManager == nullptr) { return 0; }
         return runManager->getStoredRunsSortedBySize().size();
     }
     std::string getRunfile(int index) {
-        if (runManager == nullptr) {
-            return "";
-        }
+        if (runManager == nullptr) { return ""; }
         return runManager->getStoredRunsSortedBySize()[index].first;
     }
 

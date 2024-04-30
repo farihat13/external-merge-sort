@@ -58,6 +58,9 @@ class Config {
     // ---- Duplicate ----
     static RowCount NUM_DUPLICATES;
     static RowCount NUM_DUPLICATES_REMOVED;
+    // ---- Access Count ----
+    static RowCount SSD_COUNT;
+    static RowCount HDD_COUNT;
     // ---- VERIFY ----
     static std::string VERIFY_INPUTDIR;
     static std::string VERIFY_OUTPUTDIR;

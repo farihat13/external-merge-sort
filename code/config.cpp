@@ -29,6 +29,9 @@ RowCount Config::NUM_RECORDS = 2200000LL; // 20 records
 // ---- Duplicate ----
 RowCount Config::NUM_DUPLICATES = 0;
 RowCount Config::NUM_DUPLICATES_REMOVED = 0;
+// ---- Access Count ----
+RowCount Config::SSD_COUNT = 0;
+RowCount Config::HDD_COUNT = 0;
 // ---- Verify ----
 bool Config::VERIFY_ONLY = false;
 bool Config::VERIFY = false;

@@ -256,6 +256,8 @@ void SortIterator::externalMergeSort() {
             durTotal.count() / 60);
     printvv("Removed %lld duplicate records out of %lld duplicates\n",
             Config::NUM_DUPLICATES_REMOVED, Config::NUM_DUPLICATES);
+    printvv("SSD Access Count: %lld\n", Config::SSD_COUNT);
+    printvv("HDD Access Count: %lld\n", Config::HDD_COUNT);
     printvv("===============================================\n");
     flushvv();
 } // SortIterator::externalMergeSort
