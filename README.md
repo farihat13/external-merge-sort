@@ -133,17 +133,30 @@ We verify both the sort order and sort integrity. The order ensures the output i
 
 ## Example Results
 
+**You can find example traces in this** [link](https://uwprod-my.sharepoint.com/:f:/g/personal/fislam2_wisc_edu/EhzBXejcjONImt8O0yjK4swBlzK4NjYLqI-4c9495Z3vAg?e=bfmE3A).
+
 The following run durations are the result of running in cloudlab with nvme SSD.
+
+### 1GB
+`-c 1200000 -s 1000`
+- Input_Gen Duration 4 seconds / 0 minutes
+- External_Merge_Sort Total Duration 2 seconds / 0 minutes
+- Order Verification Duration 0 seconds / 0 minutes
+- Integrity Verification Duration 2 seconds / 0 minutes
 
 ### 10GB
 `-c 6000000 -s 2048`
 - Input_Gen Duration 47 seconds / 0 minutes
 - External_Merge_Sort Total Duration 25 seconds / 0 minutes
 
+### 25GB
+
 ### 50GB
 `-c 53000000 -s 1024 `
 - Input_Gen Duration 206 seconds / 3 minutes
 - External_Merge_Sort Total Duration 222 seconds / 3 minutes
+
+### 125GB
 
 ## Members and Contributions
 
