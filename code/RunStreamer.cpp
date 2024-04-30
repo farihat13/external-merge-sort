@@ -161,9 +161,9 @@ RowCount RunStreamer::readAheadPages(PageCount nPages) {
            "%lld\n",
            nRecordsRead, reader->getFilename().c_str(), nRecordsToRead, readSoFar);
     printss("\t\tSTATE -> BG: Read %lld records in RAP\n", nRecordsRead);
-    printss("\t\tACCESS -> BG: A read from %s was made with size %llu bytes and latency %.2lf ms\n",
+    printss("\t\tACCESS -> BG: A read from %s was made with size %llu bytes and latency %.2lf us\n",
             fromDevice->getName().c_str(), nRecordsRead * Config::RECORD_SIZE,
-            fromDevice->getAccessTimeInMillis(nRecordsRead));
+            fromDevice->getAccessTimeInMicro(nRecordsRead));
     flushv();
     return nRecordsRead;
 }
@@ -264,19 +264,24 @@ RowCount RunStreamer::readStream(RowCount nRecords, bool firstTime) {
     /**
      * 1. read nRecords from the streamer and create a run (linked list of records)
      */
-    if (!firstTime) readStreamer->moveNext(); // skip the current record
+    if (!firstTime)
+        readStreamer->moveNext(); // skip the current record
     Record *head = new Record();
     Record *curr = head;
     RowCount count = 0;
     while (count < nRecords) {
         Record *rec = readStreamer->getCurrRecord();
-        if (rec == nullptr) { break; }
+        if (rec == nullptr) {
+            break;
+        }
         // if (count == 0) printv("\t\t\tFirst record: %s\n", rec->reprKey());
         // if (count == 1) printv("\t\t\tSecond record: %s\n", rec->reprKey());
         count++;
         curr->next = rec;
         curr = rec;
-        if (count < nRecords) { readStreamer->moveNext(); }
+        if (count < nRecords) {
+            readStreamer->moveNext();
+        }
     }
     // printv("\t\t\t\tRead %lld records\n", count);
     // flushv();
@@ -299,16 +304,18 @@ RowCount RunStreamer::readStream(RowCount nRecords, bool firstTime) {
         /**
          * 3. update the input cluster space of the `fromDevice`
          */
-        if (fromDevice->getName() != DISK_NAME) { fromDevice->fillInputCluster(count); }
+        if (fromDevice->getName() != DISK_NAME) {
+            fromDevice->fillInputCluster(count);
+        }
         printv("\t\t\t\tFillingSpace for %lld records in %s\n", count,
                fromDevice->getName().c_str());
         // print access time
         printss("\t\tSTATE -> BG: Wrote %lld records to %s using RS\n", count,
                 writerFilename.c_str());
         printss(
-            "\t\tACCESS -> BG: A write to %s was made with size %llu bytes and latency %.2lf ms\n",
+            "\t\tACCESS -> BG: A write to %s was made with size %llu bytes and latency %.2lf us\n",
             fromDevice->getName().c_str(), count * Config::RECORD_SIZE,
-            fromDevice->getAccessTimeInMillis(count));
+            fromDevice->getAccessTimeInMicro(count));
         flushv();
     }
     // free memory

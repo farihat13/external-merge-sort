@@ -58,7 +58,9 @@ RunManager::~RunManager() {
 
 std::string RunManager::getNextRunFileName() {
     struct stat st = {0};
-    if (stat(baseDir.c_str(), &st) == -1) { mkdir(baseDir.c_str(), 0777); }
+    if (stat(baseDir.c_str(), &st) == -1) {
+        mkdir(baseDir.c_str(), 0777);
+    }
     std::string filename = baseDir + "/r" + std::to_string(nextRunIndex++) + ".txt";
     return filename;
 }
@@ -73,7 +75,9 @@ std::vector<std::string> RunManager::getRunInfoFromDir() {
             struct stat path_stat;
             std::string filePath = baseDir + "/" + entry->d_name;
             stat(filePath.c_str(), &path_stat);
-            if (S_ISREG(path_stat.st_mode)) { runFiles.push_back(entry->d_name); }
+            if (S_ISREG(path_stat.st_mode)) {
+                runFiles.push_back(entry->d_name);
+            }
         }
         closedir(dir);
     }
@@ -107,7 +111,9 @@ Storage::Storage(std::string name, ByteCount capacity, int bandwidth, double lat
     printvv("\tBandwidth %d MB/s, Latency %3.1lf ms\n", BYTE_TO_MB(BANDWIDTH), SEC_TO_MS(LATENCY));
 
     this->configure();
-    if (this->name != DRAM_NAME) { this->runManager = new RunManager(this->name); }
+    if (this->name != DRAM_NAME) {
+        this->runManager = new RunManager(this->name);
+    }
     flushvv();
 }
 
@@ -145,7 +151,9 @@ void Storage::configure() {
 
 
 RunWriter *Storage::getRunWriter() {
-    if (runManager == nullptr) { throw std::runtime_error("ERROR: RunManager is not initialized"); }
+    if (runManager == nullptr) {
+        throw std::runtime_error("ERROR: RunManager is not initialized");
+    }
     std::string filename = runManager->getNextRunFileName();
     return new RunWriter(filename);
 }
@@ -158,7 +166,9 @@ void Storage::spill(RunWriter *writer) {
     }
 
     // Start a spill session if not already started
-    if (spillWriter == nullptr) { spillWriter = startSpillSession(); }
+    if (spillWriter == nullptr) {
+        spillWriter = startSpillSession();
+    }
 
     // Close the current writer file
     writer->close();
@@ -177,16 +187,18 @@ void Storage::spill(RunWriter *writer) {
     this->freeSpace(nRecord);
     printss("\t\tSTATE -> %s is full, Spill to %s %lld records\n", this->name.c_str(),
             spillTo->name.c_str(), nRecord);
-    printss("\t\tACCESS -> A write to %s was made with size %llu bytes and latency %.2lf ms\n",
+    printss("\t\tACCESS -> A write to %s was made with size %llu bytes and latency %.2lf us\n",
             spillTo->getName().c_str(), nRecord * Config::RECORD_SIZE,
-            spillTo->getAccessTimeInMillis(nRecord));
+            spillTo->getAccessTimeInMicro(nRecord));
     flushvv();
 }
 
 
 RowCount Storage::writeNextChunk(RunWriter *writer, Run *run) {
     RowCount _empty = this->getTotalEmptySpaceInRecords();
-    if (run->getSize() > _empty) { spill(writer); }
+    if (run->getSize() > _empty) {
+        spill(writer);
+    }
     /** assumption: spilling the current file to disk will free up enough space */
     RowCount nRecord = writer->writeNextRun(run);
     _filled += nRecord;
@@ -253,7 +265,8 @@ void Storage::endSpillSession(RunWriter *currDeviceWriter, bool deleteCurrFile) 
 
 
 bool Storage::readFrom(const std::string &filePath) {
-    if (readFile.is_open()) readFile.close();
+    if (readFile.is_open())
+        readFile.close();
     readFilePath = filePath;
     readFile.open(readFilePath, std::ios::binary);
     if (!readFile.is_open()) {
@@ -281,7 +294,8 @@ RowCount Storage::readRecords(char *data, RowCount nRecords) {
 }
 
 void Storage::closeRead() {
-    if (readFile.is_open()) readFile.close();
+    if (readFile.is_open())
+        readFile.close();
 }
 
 
@@ -303,7 +317,9 @@ std::string Storage::reprUsageDetails() {
     state += "\n\t\t\t\ttotal filled: " + std::to_string(getTotalFilledSpaceInRecords()) +
              " out of " + std::to_string(getCapacityInRecords()) + " records";
     state += ", total empty space: " + std::to_string(getTotalEmptySpaceInRecords()) + " records";
-    if (runManager != nullptr) { state += "\n\t\t\t" + runManager->repr(); }
+    if (runManager != nullptr) {
+        state += "\n\t\t\t" + runManager->repr();
+    }
     return state;
 }
 

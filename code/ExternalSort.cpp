@@ -232,16 +232,16 @@ int main(int argc, char *argv[]) {
         verifyOrder(Config::OUTPUT_FILE, capacityMB);
         auto end = std::chrono::steady_clock::now();
         auto dur = std::chrono::duration_cast<std::chrono::seconds>(end - start);
-        printv("Order Verification Duration %lld seconds / %lld minutes\n", dur.count(),
-               dur.count() / 60);
+        printvv("Order Verification Duration %lld seconds / %lld minutes\n", dur.count(),
+                dur.count() / 60);
 
         // Verify the integrity
         auto startIntegrity = std::chrono::steady_clock::now();
         verifyIntegrity(Config::INPUT_FILE, Config::OUTPUT_FILE, capacityMB);
         auto endIntegrity = std::chrono::steady_clock::now();
         dur = std::chrono::duration_cast<std::chrono::seconds>(endIntegrity - startIntegrity);
-        printv("Integrity Verification Duration %lld seconds / %lld minutes\n", dur.count(),
-               dur.count() / 60);
+        printvv("Integrity Verification Duration %lld seconds / %lld minutes\n", dur.count(),
+                dur.count() / 60);
     }
 
     flushvv();
