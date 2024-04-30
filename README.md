@@ -25,7 +25,7 @@ Here are some examples of how to run `ExternalSort.exe` with different configura
 ```sh
 ./ExternalSort.exe -c 20 -s 1024 -o trace.txt -v
 ```
-The `trace.txt` will containt the result of verification at the end of the file.
+The `trace.txt` will contain the verification result at the end of the file.
 
 #### Verify only
 ```sh
@@ -36,7 +36,7 @@ The `trace.txt` will containt the result of verification at the end of the file.
 
 This code will generate an input file `input-c20-s1024.txt` and an output file `output-c20-s1024.txt`.
 
-The trace file will contain information about disk access, how many inputs have been sorted, how many duplicates have been removed and program duration.
+The trace file will contain information about disk access, how many inputs have been sorted, how many duplicates have been removed, and program duration.
 
 Following is a snippet of `trace.log` file for `./ExternalSort.exe -c 11000000 -s 1024 -v`
 ```
@@ -97,14 +97,14 @@ We use quicksort for sorting cache-size inputs. The function `quickSort()` is in
 We generate cache-size mini runs on the input loaded to memory. This is inside `genMiniRuns()` function in `StorageTypes.cpp:Line770-800`.
 
 ### Tournament (Loser) Tree
-We use loser tree to merge the input buffers. It is implemented in `LoserTree` class inside `Losertree.h`. It provides `constructTree()` and `getNext()` functions. The loser tree is provided runs through a class called `RunStreamer` available in `RunStreamer.cpp`. This class can stream run from memory, from SSD and from HDD. Through this class, the loser tree remains oblivious, how the underlying next data is comming. The `RunStreamer` smartly pulls up the next chunk of runs from lower memory devices and fills the input buffers.
-This facilitates performing a merge where some runs are originally in SSD and some are in HDD.
+We use loser tree to merge the input buffers. It is implemented in `LoserTree` class inside `Losertree.h`. It provides `constructTree()` and `getNext()` functions. The loser tree is provided and runs through a class called `RunStreamer` available in `RunStreamer.cpp`. This class can stream run from memory, from SSD and from HDD. Through this class, the loser tree remains oblivious to how the underlying next data is coming. The `RunStreamer` smartly pulls up the next chunk of runs from lower memory devices and fills the input buffers.
+This facilitates performing a merge where some runs are originally in SSD, and some are in HDD.
 
 ### Minimum Count of Rows
-We use loser tree instead of winner tree or priority queue to minimize the number of comparisons during merging. The code for loser tree is available in `Losertree.h` inside `include` folder.
+We use a loser tree instead of a winner tree or priority queue to minimize the number of comparisons during merging. The code for loser tree is available in `Losertree.h` inside `include` folder.
 
 ### Duplicate Removal
-We remove duplicate during merging using Loser tree. When we remove a element from Loser tree, we first check if it is duplicate or not. If it is, then we skip this. It happens in three functions: `genMiniRuns()`,
+We remove duplicates during merging using the Loser tree. When we remove an element from the Loser tree, we first check if it is a duplicate or not. If it is, then we skip this. It happens in three functions: `genMiniRuns()`,
 `mergeSSDRuns()` and `mergeHDDRuns()` in `StorageTypes.cpp`. The code portions are in `StorageTypes.cpp:230-240`, `StorageTypes.cpp:520-530` and `StorageTypes.cpp:Line870-880`.
 
 ### Device-optimized Page Sizes
@@ -119,12 +119,12 @@ When merging runs stored in SSD using `mergeSSDRuns` and runs stored in HDD in `
 We keep writing the run to SSD using `writeNextChunk()`. When the SSD gets full, this function instead of writing to SSD, starts a spill session by calling `spill()`. A spill session spills one particular merged run. Each device has a `spillTo` device set, which they use to spill the data. The `spill()` is inside `Storage.cpp:Line155-185`. The code for `startSpillSession()` and `endSpillSession()` is in `Storage.cpp:Line215-250`.
 
 ### Graceful Degradation
-We perform graceful degradation, by first spilling Run to SSD and freeing up space in in-memory output buffer, and later when SSD output buffer gets filled, we free up space in SSD output buffer by spilling to HDD. The graceful degradation happens in `genMiniRuns()`, `mergeSSDRuns()` and `mergeHDDRuns()`. For example, in `genMiniRuns()`, we move some runs to SSD to make space for output buffer. The code is available in `StorageTypes.cpp:Line820-840`.
+We perform graceful degradation by first spilling Run to SSD and freeing up space in in-memory output buffer, and later when SSD output buffer gets filled, we free up space in SSD output buffer by spilling to HDD. The graceful degradation happens in `genMiniRuns()`, `mergeSSDRuns()` and `mergeHDDRuns()`. For example, in `genMiniRuns()`, we move some runs to SSD to make space for output buffer. The code is available in `StorageTypes.cpp:Line820-840`.
 
 ### Optimized Merge Patterns
-We optimize merge pattern by minimizing access to disk, whenever possible. We utilize the SSD to store runs and only write to HDD, when the SSD gets full. For example, we merge in-memory miniRuns and store them in SSD. When the SSD gets full, we merge all the runs stored in SSD, and transfer the merged run to HDD. 
+We optimize the merge pattern by minimizing access to the disk whenever possible. We utilize the SSD to store runs and only write to HDD, when the SSD gets full. For example, we merge in-memory miniRuns and store them in SSD. When the SSD gets full, we merge all the runs stored in SSD, and transfer the merged run to HDD. 
 By writing long runs sequentially to disk, we make the best use of Disk when necessary. By allowing the merge of SSD and HDD runs together inside `mergeHDDRuns` function, we avoid multiple steps of merging SSD runs first and then HDD runs and make the most use of SSD capacity. 
-The `externalMergeSort()` and `firstPass()` functions inside `Sort.cpp` can provide a high level overview of our strategy. 
+The `externalMergeSort()` and `firstPass()` functions inside `Sort.cpp` can provide a high-level overview of our strategy. 
 
 ### Verify Sort Order
 We verify both the sort order and sort integrity. The order ensures the output is in sorted order in `verifyOrder()`. The integrity ensures all the input record are available in the output record except the duplicates in `verifyIntegrity()`. Both code are available in `Verify.cpp` in `Line60-130` and `Line 305-370`. The integrity check is done using hash partition. This can take a long time and requires large space. We smartly make it faster and memory efficient by hashing the records, which reduces both the partition size and the cost of comparisons.
@@ -134,7 +134,7 @@ We verify both the sort order and sort integrity. The order ensures the output i
 
 **You can find example traces in this** [link](https://uwprod-my.sharepoint.com/:f:/g/personal/fislam2_wisc_edu/EhzBXejcjONImt8O0yjK4swBlzK4NjYLqI-4c9495Z3vAg?e=bfmE3A).
 
-The following run durations are the result of running in cloudlab with nvme SSD. We show the result of runs in various settings.
+The following run durations result from running in Cloudlab with NVMe SSD. We show the result of runs in various settings.
 
 ### 1GB
 `-c 1200000 -s 1000`
