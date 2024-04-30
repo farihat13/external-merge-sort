@@ -56,14 +56,66 @@ bool isRecordMax(Record *r) {
 // =========================================================
 
 
+Record *RunReader::readNextRecords(RowCount *nRecords) {
+    RowCount nRecordsToRead = *nRecords;
+    RowCount nRecordsReadSoFar = 0;
+    Record *head = new Record();
+    Record *curr = head;
+
+    // Read records page by page
+    ByteCount nBytesToRead = this->PAGE_SIZE_IN_RECORDS * Config::RECORD_SIZE;
+    char *recData = new char[nBytesToRead];
+    while (nRecordsReadSoFar < nRecordsToRead) {
+
+        if (_is.eof()) { break; }
+
+        _is.read(recData, nBytesToRead);
+        ByteCount nBytesRead = _is.gcount();
+
+        if (nBytesRead == 0) { break; }
+
+        if (nBytesRead % Config::RECORD_SIZE != 0) {
+            delete[] recData;
+            std::string msg = "Error: Read " + std::to_string(nBytesRead) +
+                              " bytes, not aligned with record size";
+            printv("%s\n", msg.c_str());
+            throw std::runtime_error(msg);
+        }
+
+        // Create a linked list of records
+        for (RowCount i = 0; i < nBytesRead / Config::RECORD_SIZE; i++) {
+            Record *rec = new Record(recData + i * Config::RECORD_SIZE);
+            curr->next = rec;
+            curr = rec;
+            nRecordsReadSoFar++;
+        }
+    }
+
+    curr->next = nullptr;          // mark the end of the linked list
+    *nRecords = nRecordsReadSoFar; // update the number of records read
+    curr = head->next;             // skip the dummy head
+
+    // Free memory
+    delete head;      // delete the dummy head
+    delete[] recData; // delete the buffer
+
+    // Return the head of the linked list
+    return curr;
+}
+
+
 // =========================================================
 // ----------------------- RunWriter -----------------------
 // =========================================================
 
 
 RowCount RunWriter::writeFromFile(std::string writeFromFilename, RowCount toCopyNRecords) {
+
+    // Open the given file
     std::ifstream is(writeFromFilename, std::ios::binary);
     if (!is) { throw std::runtime_error("Error: Opening file " + writeFromFilename); }
+
+    // Copy the records from the given file to this writer's file
     ByteCount bufSize = RoundUp(1024 * 1024, Config::RECORD_SIZE);
     char *buffer = new char[bufSize];
     ByteCount total = 0;
@@ -75,15 +127,25 @@ RowCount RunWriter::writeFromFile(std::string writeFromFilename, RowCount toCopy
     }
     delete[] buffer;
     if (!_os) { throw std::runtime_error("Error: Writing to file"); }
+
+    // Update the writer's size
     RowCount nRecords = total / Config::RECORD_SIZE;
     currSize += nRecords;
+
     printv("\t\t\t\tRunWriter copied %llu out of %llu records from %s to %s\n", nRecords,
            toCopyNRecords, writeFromFilename.c_str(), _filename.c_str());
+
+    // Check if the number of records copied is as expected
     assert(toCopyNRecords == nRecords);
+
+    // Return the number of records copied
     return nRecords;
-}
+
+} // writeFromFile
+
 
 RowCount RunWriter::writeNextRun(Run *run) {
+
     char *data = run->getAllData();
     RowCount nRecords = run->getSize();
     _os.write(data, nRecords * Config::RECORD_SIZE);
@@ -91,4 +153,5 @@ RowCount RunWriter::writeNextRun(Run *run) {
     currSize += nRecords;
     delete[] data;
     return nRecords;
-}
+
+} // writeNextRun

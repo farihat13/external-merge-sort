@@ -56,15 +56,20 @@ void SortIterator::getPage(Page *p) { TRACE(true); } // SortIterator::getPage
 
 void SortIterator::firstPass() {
     TRACE(true);
+
+    // Skip sorting if there are no records
     if (Config::NUM_RECORDS == 0) {
         printvv("No records to sort\n");
         return;
     }
+
+    // Skip sorting if there is only one record
     if (Config::NUM_RECORDS == 1) {
         printvv("Only one record to sort\n");
         return;
     }
 
+    // Verify input file exists
     bool okay = _hdd->readFrom(Config::INPUT_FILE);
     if (!okay) {
         printvv("ERROR: unable to read from input file\n");
@@ -74,11 +79,13 @@ void SortIterator::firstPass() {
     int printStatus = 1;
     _consumed = 0;
     while (true) {
+        // Check if all input records are read
         if (_consumed >= Config::NUM_RECORDS) {
             printvv("All input records read\n");
             break;
         }
 
+        // Print status
         double consumedPerc = ((double)_consumed) * 100.0 / Config::NUM_RECORDS;
         if (consumedPerc > printStatus * 1.0) {
             printvv("\tConsumed %.1lf%% input. %llu out of %lld records.\n\t", consumedPerc,
@@ -87,9 +94,9 @@ void SortIterator::firstPass() {
             printStatus++;
         }
 
-        /**
-         * 3. if SSD is full, merge runs in SSD and spill some runs to HDD
-         */
+
+        // If the next DRAM load will exceed SSD capacity, merge runs in SSD
+        // This will spill the merged run to HDD and free up space in SSD
         RowCount nRecordsLeft = Config::NUM_RECORDS - _consumed;
         RowCount _ssdCurrSize = _ssd->getTotalFilledSpaceInRecords();
         RowCount nRecordsNext = std::min(nRecordsLeft, _dramCapacity);
@@ -98,9 +105,7 @@ void SortIterator::firstPass() {
             _ssd->mergeSSDRuns(_hdd);
         }
 
-        /**
-         * 1. Read records from input file to DRAM
-         */
+        // Read records from input file to DRAM
         PageCount nHDDPages = _dramCapacity / _hddPageSize;
         RowCount nRecordsToRead = nHDDPages == 0 ? _dramCapacity : nHDDPages * _hddPageSize;
         nRecordsToRead = std::min(nRecordsToRead, nRecordsLeft);
@@ -113,13 +118,17 @@ void SortIterator::firstPass() {
         printv("\tconsumed %llu records, left %llu records in input\n", _consumed,
                Config::NUM_RECORDS - _consumed);
 
-        /**
-         * 2. Sort records in DRAM, create mini-runs, merge mini-runs, store them in SSD and reset
-         * DRAM
-         */
+        // Sort records in DRAM
+        // - Create mini-runs using quicksort,
+        // - Spill some mini-runs to SSD to free up space for output buffer in DRAM
+        // - Merge mini-runs, store the merged run in SSD and reset DRAM
         _dram->genMiniRuns(nRecords, _ssd);
     }
-    _hdd->closeRead(); // close the input file
+
+    // Close the input file
+    _hdd->closeRead();
+
+
     if (_ssd->getRunfilesCount() > 1) {
         // Merge all runs in SSD, expecting the merged run to spill to HDD
         _ssd->mergeSSDRuns(_hdd);
@@ -146,10 +155,10 @@ void SortIterator::externalMergeSort() {
     _dramPageSize = _dram->getPageSizeInRecords();
 
 
-    /**
-     * 1. First pass: read records from input file to DRAM, sort them, and spill runs to SSD and
-     * HDD, and merge runs in SSD
-     */
+    // First pass
+    // - Read records from input file to DRAM, sort and merge them, and spill runs to SSD and HDD
+    // - When SSD is full, merge runs in SSD and spill the merged run to HDD
+    // - Repeat until all input records are read
     printvv("\n========= EXTERNAL_MERGE_SORT START =========\n");
     auto start = std::chrono::steady_clock::now();
     this->firstPass();
@@ -160,12 +169,13 @@ void SortIterator::externalMergeSort() {
             durFirstPass.count() / 60);
     flushvv();
 
-    /**
-     * 2. Merge all runs in SSD and HDD
-     *
-     */
+
+    // Merge all runs in SSD and HDD
+    // - At this point, all runs are in SSD and HDD
+    // - Merge runs in SSD and HDD until only one run is left
     int mergeIteration = 0;
     while (true) {
+        // Check if all records are merged
         if (Config::NUM_RECORDS == 0) {
             printvv("SUCCESS: No records to merge\n");
             break;
@@ -182,6 +192,7 @@ void SortIterator::externalMergeSort() {
             destFile.close();
             break;
         }
+
         int nRFilesInSSD = _ssd->getRunfilesCount();
         int nRFilesInHDD = _hdd->getRunfilesCount();
         printvv("\tMERGE_ITR %d: %d runfiles in SSD, %d runfiles in HDD\n", mergeIteration,
@@ -193,43 +204,53 @@ void SortIterator::externalMergeSort() {
             throw std::runtime_error("invalid runs in SSD or HDD");
             break;
         }
-        if (nRFilesInHDD == 0) { // no runfiles in HDD
+
+        if (nRFilesInHDD == 0) {
+            // No runfiles in HDD
             if (nRFilesInSSD < 1) {
                 printvv("ERROR: no runs to merge\n");
                 break;
             } else if (nRFilesInSSD == 1) {
+                // Only one runfile in SSD, this is the final run, Rename it to output file
                 printvv("SUCCESS: all runs merged\n");
-                // rename the runfile to output file
                 std::string src = _ssd->getRunfile(0);
                 std::string dest = Config::OUTPUT_FILE;
                 rename(src.c_str(), dest.c_str());
-
                 break;
-            } // else: merge runs in SSD
+            }
+
+            // More than one runfile in SSD, merge them
             _ssd->mergeSSDRuns(_hdd);
-        } else { // some runfiles in HDD
+
+        } else {
+            // There are runfiles in HDD
             if (nRFilesInHDD == 1 && nRFilesInSSD == 0) {
-                /** all runs merged, because there is only one run in HDD, and no runs in SSD */
+                // Only one runfile in HDD, this is the final run, Rename it to output file
                 printvv("SUCCESS: all runs merged\n");
-                // rename the runfile to output file
                 std::string src = _hdd->getRunfile(0);
                 std::string dest = Config::OUTPUT_FILE;
                 rename(src.c_str(), dest.c_str());
-
                 break;
-            } else {
-                _hdd->mergeHDDRuns();
             }
+
+            // Merge runs in SSD and HDD
+            // - this will merge runs from SSD and HDD together with the help of RunStreamer
+            _hdd->mergeHDDRuns();
         }
         auto endMerge = std::chrono::steady_clock::now();
         auto durMerge = std::chrono::duration_cast<std::chrono::seconds>(endMerge - startMerge);
         printvv("\tMERGE_ITR %d COMPLETE: Duration %lld seconds / %lld minutes\n", mergeIteration,
                 durMerge.count(), durMerge.count() / 60);
+        flushvv();
+
+        // Increment merge iteration
         ++mergeIteration;
     }
     auto endMerge = std::chrono::steady_clock::now();
     auto durMerge = std::chrono::duration_cast<std::chrono::seconds>(endMerge - endFirstPass);
     auto durTotal = std::chrono::duration_cast<std::chrono::seconds>(endMerge - start);
+
+    // End of external merge sort, print stats
     printvv("======== EXTERNAL_MERGE_SORT COMPLETE =========\n");
     printvv("External_Merge_Sort Total Duration %lld seconds / %lld minutes\n", durTotal.count(),
             durTotal.count() / 60);

@@ -197,6 +197,7 @@ void cleanup() {
     printv("deleted HDD\n");
     flushv();
     printvv("Cleanup done\n");
+    flushvv();
 }
 
 
@@ -219,11 +220,9 @@ int main(int argc, char *argv[]) {
         delete it;
         delete plan;
 
-        // cleanup what was initialized in init()
+        // Cleanup what was initialized in init()
         cleanup();
     }
-
-#include <chrono>
 
     if (Config::VERIFY_ONLY || Config::VERIFY) {
         uint64_t capacityMB = 1024; // 1 GB or 1024 memory used for verification
@@ -244,6 +243,8 @@ int main(int argc, char *argv[]) {
         printv("Integrity Verification Duration %lld seconds / %lld minutes\n", dur.count(),
                dur.count() / 60);
     }
+
+    flushvv();
 
     return 0;
 } // main

@@ -20,14 +20,13 @@
 class Record {
   private:
     Record(bool allocMemory) {
+        data = nullptr;
+        next = nullptr;
         if (allocMemory) {
             data = new char[Config::RECORD_SIZE];
             data[0] = '!';  // mark the record as invalid
             data[1] = '\0'; // null terminate the string
-        } else {
-            data = nullptr;
         }
-        next = nullptr;
     }
 
   public:
@@ -105,11 +104,18 @@ class Run {
     RowCount size;
 
   public:
+    /**
+     * @brief Construct a new Run object
+     * @param head Head of the linked list of records
+     * @param size Number of records in the run
+     */
     Run(Record *head, RowCount size) : runHead(head), size(size) {}
+
+    /**
+     * @brief Destroy the Run object
+     * @note It frees the memory allocated for each record in the run
+     */
     ~Run() {
-        // printvv("\t\t\tRun destroying: head %s\n",
-        //         (runHead == nullptr ? "NULL" : runHead->reprKey()));
-        flushvv();
         Record *curr = runHead;
         RowCount i = 0;
         while (curr != nullptr && i < size) {
@@ -118,15 +124,19 @@ class Run {
             i++;
             curr = next;
         }
-        // printvv("\t\t\tRun destroyed, Deleted %lld out of %lld records\n", i, size);
         flushvv();
     }
 
-    // getters
+    // Getters
     Record *getHead() { return runHead; }
     void setHead(Record *head) { runHead = head; }
     RowCount getSize() { return size; }
 
+    /**
+     * @brief Get all the data from the run as a single buffer
+     * @return char* buffer containing all the data
+     * @note The caller is responsible for freeing the memory
+     */
     char *getAllData() {
         char *buffer = new char[size * Config::RECORD_SIZE];
         Record *curr = runHead;
@@ -142,6 +152,9 @@ class Run {
         return buffer;
     }
 
+    /**
+     * @brief Check if the run is sorted
+     */
     bool isSorted() {
         Record *curr = runHead, *prev = nullptr;
         RowCount i = 0;
@@ -162,7 +175,10 @@ class Run {
         return true;
     }
 
-    // print
+
+    /**
+     * @brief Print the run to stdout
+     */
     void printRun() {
         Record *curr = runHead;
         while (curr != nullptr) {
@@ -223,7 +239,9 @@ class RunReader {
     bool _isDeleted = false;
 
   public:
-    // member functions
+    /**
+     * @brief Construct a new RunReader object
+     */
     RunReader(const std::string &filename, RowCount filesize, RowCount pageSizeInRecords)
         : filename(filename), filesize(filesize), PAGE_SIZE_IN_RECORDS(pageSizeInRecords),
           _is(filename, std::ios::binary) {
@@ -231,18 +249,32 @@ class RunReader {
         _is.seekg(0, std::ios::beg);
         printv("\t\t\t\tRunReader opened '%s'\n", filename.c_str());
     }
+
+    /**
+     * @brief Destroy the RunReader object
+     * @note It closes the file if it is open
+     */
     ~RunReader() {
         if (!_isDeleted) {
             if (_is.is_open()) { _is.close(); }
         }
         printv("\t\t\t\tRunReader destroyed '%s'\n", filename.c_str());
     }
+
+    /**
+     * @brief Close the reader
+     */
     void close() {
         if (!_isDeleted) {
             if (_is.is_open()) { _is.close(); }
         }
         printv("\t\t\t\tRunReader closed '%s'\n", filename.c_str());
     }
+
+    /**
+     * @brief Delete the file associated with this reader
+     * @note Calling this function second time will have no effect
+     */
     void deleteFile() {
         if (!_isDeleted) {
             if (_is.is_open()) { _is.close(); }
@@ -253,55 +285,22 @@ class RunReader {
         }
         printv("\t\t\t\tDEBUG: RunReader Deleted '%s'\n", filename.c_str());
     }
+
+    /**
+     * @brief Check if the file associated with this reader is deleted
+     * @return true if the file is deleted
+     * @note Used by RunStreamer
+     */
     bool isDeletedFile() { return _isDeleted; }
-    Record *readNextRecords(RowCount *nRecords) {
-        RowCount nRecordsToRead = *nRecords;
-        RowCount nRecordsReadSoFar = 0;
-        Record *head = new Record();
-        Record *curr = head;
-        ByteCount nBytesToRead = this->PAGE_SIZE_IN_RECORDS * Config::RECORD_SIZE;
-        char *recData = new char[nBytesToRead];
-        while (nRecordsReadSoFar < nRecordsToRead) {
-            /* if EOF reached, break */
-            if (_is.eof()) { break; }
-            /** read one page at a time */
-            _is.read(recData, nBytesToRead);
-            ByteCount nBytesRead = _is.gcount();
-            /* if no bytes read, delete record and break */
-            if (nBytesRead == 0) { break; }
-            /* if bytes read is not equal to record size, throw error */
-            if (nBytesRead % Config::RECORD_SIZE != 0) {
-                delete[] recData;
-                std::string errorMsg = "ERROR: Read " + std::to_string(nBytesRead) +
-                                       " bytes, which is not aligned with record size " +
-                                       std::to_string(Config::RECORD_SIZE);
-                printv("%s\n", errorMsg.c_str());
-                throw std::runtime_error(errorMsg);
-            }
-            /** add records to linked list */
-            for (RowCount i = 0; i < nBytesRead / Config::RECORD_SIZE; i++) {
-                Record *rec = new Record(recData + i * Config::RECORD_SIZE);
-                curr->next = rec;
-                curr = rec;
-                nRecordsReadSoFar++;
-            }
-            // printv("\t\t\t\tRead %lld records\n", nRecordsReadSoFar);
-            // flushv();
-        }
-        /** return the head of the linked list */
-        curr->next = nullptr;          // mark the end of the linked list
-        *nRecords = nRecordsReadSoFar; // update the number of records read
-        curr = head->next;             // skip the dummy head
-        // free memory
-        delete head;      // delete the dummy head
-        delete[] recData; // delete the buffer
-        return curr;      // return the head of the linked list
-    }
 
+    /**
+     * @brief Read the next n records from the reader's file
+     * @param nRecords Number of records to read, updated with actual number of records read
+     * @return the head of the linked list of records
+     */
+    Record *readNextRecords(RowCount *nRecords);
 
-    // std::vector<Page *> readNextPages(int nPages);
-
-    // getters
+    // Getters
     std::string getFilename() { return filename; }
     RowCount getFilesize() { return filesize; }
     RowCount getPageSizeInRecords() { return PAGE_SIZE_IN_RECORDS; }
@@ -323,19 +322,42 @@ class RunWriter {
     bool _isDeleted = false;
 
   public:
+    /**
+     * @brief Construct a new RunWriter object
+     */
     RunWriter(const std::string &filename)
         : _filename(filename), _os(filename, std::ios::binary | std::ios::trunc) {
         if (!_os) { throw std::runtime_error("Cannot open file: " + filename); }
         printv("\t\t\t\tRunWriter opened '%s'\n", filename.c_str());
     }
 
+    /**
+     * @brief Destroy the RunWriter object
+     */
     ~RunWriter() {
         if (_os.is_open()) { _os.close(); }
         printv("\t\t\t\tRunWriter destroyed '%s'\n", _filename.c_str());
     }
 
+    /**
+     * Write the given run to this writer's file
+     * @param run
+     * @return number of records written
+     */
     RowCount writeNextRun(Run *run);
+
+    /**
+     * Write the records from the given file name to this writer's file
+     * @param writeFromFilename
+     * @param toCopyNRecords
+     * @return number of records copied
+     */
     RowCount writeFromFile(std::string filename, RowCount toCopyNRecords);
+
+
+    /**
+     * @brief Reset the writer, truncate the file to 0 bytes
+     */
     void reset() {
         if (_os.is_open()) { _os.close(); }
         // truncate the file to 0 bytes
@@ -344,12 +366,21 @@ class RunWriter {
         currSize = 0;
         printv("\t\t\t\tRunWriter RESET '%s'\n", _filename.c_str());
     }
+
+    /**
+     * @brief Close the writer
+     */
     void close() {
         if (!_isDeleted) {
             if (_os.is_open()) { _os.close(); }
         }
         printv("\t\t\t\tRunWriter closed '%s'\n", _filename.c_str());
     }
+
+    /**
+     * @brief Delete the file associated with this writer
+     * @note Calling this function second time will have no effect
+     */
     void deleteFile() {
         if (!_isDeleted) {
             if (_os.is_open()) { _os.close(); }
@@ -360,7 +391,14 @@ class RunWriter {
         }
         printv("\t\t\t\tRunReader Deleted '%s'\n", _filename.c_str());
     }
+
+    /**
+     * @brief Check if the file associated with this writer is deleted
+     * @return true if the file is deleted
+     * @note Used by spill writer at the end of a session
+     */
     bool isDeletedFile() { return _isDeleted; }
+
     // ---- getters ----
     std::string getFilename() { return _filename; }
     RowCount getCurrSize() { return currSize; }

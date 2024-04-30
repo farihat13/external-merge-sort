@@ -11,16 +11,20 @@
 
 
 RunManager::RunManager(std::string deviceName) {
+    // Create a directory for the device runs
     baseDir = deviceName + "_runs";
     nextRunIndex = 0;
     runFiles.clear();
 
     struct stat st = {0};
     if (stat(baseDir.c_str(), &st) == -1) {
-        // if the directory does not exist, create it
+
+        // If the directory does not exist, create it
         mkdir(baseDir.c_str(), 0700);
+
     } else {
-        // if the dir exits, delete all run files in the directory
+
+        // If the dir exits, delete all run files in the directory
         int counter = 0;
         DIR *dir = opendir(baseDir.c_str());
         if (dir) {
@@ -44,7 +48,7 @@ RunManager::RunManager(std::string deviceName) {
 }
 
 RunManager::~RunManager() {
-    // give a warning if there are any run files left
+    // Give a warning if there are any run files left
     if (getRunInfoFromDir().size() > 0) {
         printvv("WARNING: %d run files left in %s\n", runFiles.size(), baseDir.c_str());
     }
@@ -60,7 +64,6 @@ std::string RunManager::getNextRunFileName() {
 }
 
 
-// validatations
 std::vector<std::string> RunManager::getRunInfoFromDir() {
     std::vector<std::string> runFiles;
     DIR *dir = opendir(baseDir.c_str());
@@ -108,6 +111,7 @@ Storage::Storage(std::string name, ByteCount capacity, int bandwidth, double lat
     flushvv();
 }
 
+
 void Storage::configure() {
     // Calculate the page size in records
     ByteCount nBytes = this->BANDWIDTH * this->LATENCY;
@@ -118,16 +122,17 @@ void Storage::configure() {
             getSizeDetails(this->PAGE_SIZE_IN_RECORDS * Config::RECORD_SIZE).c_str());
 
     if (this->name != DISK_NAME) {
-        // calculate a rough cluster size (buffer size per run) in pages
+
+        // Calculate a rough cluster size (buffer size per run) in pages
         RowCount nRecords = CAPACITY_IN_BYTES / Config::RECORD_SIZE;
         PageCount nPages = nRecords / PAGE_SIZE_IN_RECORDS;
         CLUSTER_SIZE = nPages / (MAX_MERGE_FAN_IN + MAX_MERGE_FAN_OUT);
 
-        // calculate the merge fan-in and merge fan-out
+        // Calculate the merge fan-in and merge fan-out
         MERGE_FANIN_IN_RECORDS = MAX_MERGE_FAN_IN * CLUSTER_SIZE * PAGE_SIZE_IN_RECORDS;
         MERGE_FANOUT_IN_RECORDS = getCapacityInRecords() - MERGE_FANIN_IN_RECORDS;
 
-        // print the configurations
+        // Print the configurations
         printvv("\tCluster Size: %d pages / %s\n", CLUSTER_SIZE,
                 getSizeDetails(CLUSTER_SIZE * PAGE_SIZE_IN_RECORDS * Config::RECORD_SIZE).c_str());
         printvv("\tInput Buffer Total Size: %llu records\n", this->MERGE_FANIN_IN_RECORDS);
@@ -135,7 +140,9 @@ void Storage::configure() {
     }
 }
 
+
 // ------------------------------- Run Management ------------------------------
+
 
 RunWriter *Storage::getRunWriter() {
     if (runManager == nullptr) { throw std::runtime_error("ERROR: RunManager is not initialized"); }
@@ -149,10 +156,14 @@ void Storage::spill(RunWriter *writer) {
         printvv("ERROR: %s is full, no spillTo device\n", this->name.c_str());
         throw std::runtime_error("Error: Storage is full, no spillTo device");
     }
+
+    // Start a spill session if not already started
     if (spillWriter == nullptr) { spillWriter = startSpillSession(); }
-    // close the current file
+
+    // Close the current writer file
     writer->close();
-    // copy the file content to spillWriter
+
+    // Copy the current writer file content to spillWriter
     RowCount nRecord = spillWriter->writeFromFile(writer->getFilename(), writer->getCurrSize());
     if (nRecord != writer->getCurrSize()) {
         printvv("ERROR: Failed to copy %lld records to %s\n", writer->getCurrSize(),
@@ -166,7 +177,7 @@ void Storage::spill(RunWriter *writer) {
     this->freeSpace(nRecord);
     printss("\t\tSTATE -> %s is full, Spill to %s %lld records\n", this->name.c_str(),
             spillTo->name.c_str(), nRecord);
-    printss("\t\tACCESS -> A write to %s was made with size %llu bytes and latency %d ms\n",
+    printss("\t\tACCESS -> A write to %s was made with size %llu bytes and latency %.2lf ms\n",
             spillTo->getName().c_str(), nRecord * Config::RECORD_SIZE,
             spillTo->getAccessTimeInMillis(nRecord));
     flushvv();
