@@ -1,11 +1,11 @@
 # compiler options
-CPPOPT=-g -Og -D_DEBUG -D_VALIDATE #-D_USE_LOGFILE #-D_DUP_CHECK #-DUP_GEN
+CPPOPT=-g -Og -D_VALIDATE -D_DUP_GEN -D_USE_LOGFILE #-D_DEBUG #-D_SMALL #-D_USE_LOGFILE #-D_SMALL #-D_VERIFY #-D_SMALL #-D_USE_LOGFILE #-D_DUP_CHECK #-DUP_GEN
 # -O2 -Os -Ofast
-# -fprofile-generate -fprofile-use
-# -fsanitize=address -fsanitize=leak -fsanitize=undefined
+# CPPOPT+=--fprofile-generate -fprofile-use
+# CPPOPT+=-fsanitize=address -fsanitize=leak -fsanitize=undefined
 
 # compiler flags
-CPPFLAGS=$(CPPOPT) -Wall -ansi -pedantic -std=c++11 -Iinclude
+CPPFLAGS=$(CPPOPT) -Wall -ansi -pedantic -std=c++11 -Iinclude -Wno-reorder
 # -Wparentheses -Wno-unused-parameter -Wformat-security
 # -fno-rtti -std=c++11 -std=c++98
 
@@ -22,7 +22,7 @@ OBJS=$(SRCS:%.cpp=%.o)
 	g++ $(CPPFLAGS) -c $< -o $@
 
 # default target
-$(TARGET) : $(OBJS)
+$(TARGET) : $(OBJS) Makefile
 	g++ $(CPPFLAGS) -o ExternalSort.exe $(OBJS)
 
 trace : ExternalSort.exe Makefile
@@ -35,10 +35,19 @@ run: $(TARGET)
 	./$(TARGET) -c 2500000 -s 1000
 
 run1G: $(TARGET)
-	./$(TARGET) -c 1200000 -s 1000
+	./$(TARGET) -c 1200000 -s 1000 -v
+
+run5G: $(TARGET)
+	./$(TARGET) -c 6000000 -s 1024 -v
+
+run10G: $(TARGET)
+	./$(TARGET) -c 11000000 -s 1024
 
 run20G: $(TARGET)
-	./$(TARGET) -c 20971520 -s 1024
+	./$(TARGET) -c 22000000 -s 1024
+
+run50G: $(TARGET)
+	./$(TARGET) -c 53000000 -s 1024
 
 run125G: $(TARGET)
 	./$(TARGET) -c 131072000 -s 1024
@@ -48,10 +57,8 @@ run2G: $(TARGET)
 	./$(TARGET) -c 3000000 -s 1000 >> trace
 	@size -t $(TARGET) $(OBJS) | sort -r >> trace
 
-run100M: $(TARGET)
-#	@date > trace
-	./$(TARGET) -c 100000 -s 1000 
-#	@size -t $(TARGET) $(OBJS) | sort -r >> trace
+run5M: $(TARGET)
+	./$(TARGET) -c 50 -s 100 -v
 
 list : Makefile
 	echo Makefile $(HDRS) $(SRCS) $(DOCS) $(SCRS) > list
@@ -63,4 +70,4 @@ clean :
 
 cleanall:
 	@rm -f $(OBJS) ExternalSort.exe ExternalSort.exe.stackdump trace list count input*.txt output*.txt
-	@rm -rf HDD_runs SSD_runs DRAM_runs *.tmp
+	@rm -rf HDD_runs SSD_runs DRAM_runs *.tmp Verify_parts

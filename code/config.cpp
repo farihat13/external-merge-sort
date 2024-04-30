@@ -10,25 +10,31 @@
 // ---- Cache ----
 int Config::CACHE_SIZE = 1 * 1024 * 1024; // 1 MB
 // ---- DRAM ----
-// ByteCount Config::DRAM_CAPACITY = 1LL * 20 * 1024 * 1024; // 20 MB TODO: change to 100 MB
 ByteCount Config::DRAM_CAPACITY = 1LL * 100 * 1024 * 1024; // 100 MB
 double Config::DRAM_LATENCY = 1.0 / (1000 * 1000);         // 10 microsecond
 int Config::DRAM_BANDWIDTH = 100 * 1024 * 1024;            // 100 GB/s
-// DRAM buffer size = 1 MB
 // ---- SSD ----
-// ByteCount Config::SSD_CAPACITY = 1LL * 75 * 1024 * 1024; // 75 MB TODO: change to 10GB
 ByteCount Config::SSD_CAPACITY = 10LL * 1024 * 1024 * 1024; // 10GB
 double Config::SSD_LATENCY = 1.0 / (10 * 1000);             // 0.1 ms
-int Config::SSD_BANDWIDTH = 100 * 1024 * 1024;              // 100 MB/s
+int Config::SSD_BANDWIDTH = 200 * 1024 * 1024;              // 200 MB/s
 // SSD buffer size = 10 MB
 // ---- HDD ----
 ByteCount Config::HDD_CAPACITY = INFINITE_CAPACITY * 1LL; // Infinite
-double Config::HDD_LATENCY = 1 * 10.0 / 1000;             // 10 ms
+double Config::HDD_LATENCY = 1 * 5.0 / 1000;              // 5 ms
 int Config::HDD_BANDWIDTH = 100 * 1024 * 1024;            // 100 MB/s
 // ---- Record ----
-int Config::RECORD_KEY_SIZE = 8;     // 8 bytes
-int Config::RECORD_SIZE = 1024;      // 1024 bytes
-RowCount Config::NUM_RECORDS = 20LL; // 20 records
+int Config::RECORD_KEY_SIZE = 8;          // 8 bytes
+int Config::RECORD_SIZE = 1024;           // 1024 bytes
+RowCount Config::NUM_RECORDS = 2200000LL; // 20 records
+// ---- Duplicate ----
+RowCount Config::NUM_DUPLICATES = 0;
+RowCount Config::NUM_DUPLICATES_REMOVED = 0;
+// ---- Verify ----
+bool Config::VERIFY_ONLY = false;
+bool Config::VERIFY = false;
+std::string Config::VERIFY_INPUTDIR = "Verify_parts/input/";
+std::string Config::VERIFY_OUTPUTDIR = "Verify_parts/output/";
+int Config::VERIFY_HASH_BYTES = sizeof(uint64_t);
 // ---- File ----
 std::string Config::OUTPUT_FILE = "output.txt";
 std::string Config::INPUT_FILE = "input.txt";
@@ -36,32 +42,33 @@ std::string Config::TRACE_FILE = "trace.log";
 // ================================
 
 void printConfig() {
-    printv("\n== Configurations ==\n");
+    printvv("\n============== Configurations ===============\n");
     // ---- Cache ----
-    printv("\tCACHE_SIZE: %d bytes\n", Config::CACHE_SIZE);
+    printvv("\tCACHE_SIZE: %d bytes\n", Config::CACHE_SIZE);
     // ---- DRAM ----
-    printv("\tDRAM_SIZE: %d bytes\n", Config::DRAM_CAPACITY);
-    printv("\tDRAM_LATENCY: %f\n", Config::DRAM_LATENCY);
-    printv("\tDRAM_BANDWIDTH: %d\n", Config::DRAM_BANDWIDTH);
+    printvv("\tDRAM_SIZE: %d bytes\n", Config::DRAM_CAPACITY);
+    printvv("\tDRAM_LATENCY: %f\n", Config::DRAM_LATENCY);
+    printvv("\tDRAM_BANDWIDTH: %d\n", Config::DRAM_BANDWIDTH);
     // ---- SSD ----
-    printv("\tSSD_SIZE: %lld bytes\n", Config::SSD_CAPACITY);
-    printv("\tSSD_LATENCY: %f\n", Config::SSD_LATENCY);
-    printv("\tSSD_BANDWIDTH: %d\n", Config::SSD_BANDWIDTH);
+    printvv("\tSSD_SIZE: %lld bytes\n", Config::SSD_CAPACITY);
+    printvv("\tSSD_LATENCY: %f\n", Config::SSD_LATENCY);
+    printvv("\tSSD_BANDWIDTH: %d\n", Config::SSD_BANDWIDTH);
     // ---- HDD ----
-    printv("\tHDD_SIZE: %d bytes\n", Config::HDD_CAPACITY);
-    printv("\tHDD_LATENCY: %f\n", Config::HDD_LATENCY);
-    printv("\tHDD_BANDWIDTH: %d\n", Config::HDD_BANDWIDTH);
+    printvv("\tHDD_SIZE: %d bytes\n", Config::HDD_CAPACITY);
+    printvv("\tHDD_LATENCY: %f\n", Config::HDD_LATENCY);
+    printvv("\tHDD_BANDWIDTH: %d\n", Config::HDD_BANDWIDTH);
     // ---- Record ----
-    printv("\tRECORD_KEY_SIZE: %d bytes\n", Config::RECORD_KEY_SIZE);
-    printv("\tRECORD_SIZE: %d bytes\n", Config::RECORD_SIZE);
-    printv("\tNUM_RECORDS: %lld (%s)\n", Config::NUM_RECORDS,
-           formatNum(Config::NUM_RECORDS).c_str());
-    printv("\tInput Size: %sBytes\n", formatNum(getInputSizeInBytes()).c_str());
+    printvv("\tRECORD_KEY_SIZE: %d bytes\n", Config::RECORD_KEY_SIZE);
+    printvv("\tRECORD_SIZE: %d bytes\n", Config::RECORD_SIZE);
+    printvv("\tNUM_RECORDS: %lld (%s)\n", Config::NUM_RECORDS,
+            formatNum(Config::NUM_RECORDS).c_str());
+    printvv("\tInput Size: %sBytes\n", formatNum(getInputSizeInBytes()).c_str());
     // ---- File ----
-    printv("\tOUTPUT_FILE: %s\n", Config::OUTPUT_FILE.c_str());
-    printv("\tINPUT_FILE: %s\n", Config::INPUT_FILE.c_str());
-    printv("\tTRACE_FILE: %s\n", Config::TRACE_FILE.c_str());
-    printv("== End Configurations ==\n\n");
+    printvv("\tOUTPUT_FILE: %s\n", Config::OUTPUT_FILE.c_str());
+    printvv("\tINPUT_FILE: %s\n", Config::INPUT_FILE.c_str());
+    printvv("\tTRACE_FILE: %s\n", Config::TRACE_FILE.c_str());
+    printvv("============ End Configurations ===============\n\n");
+    flushvv();
 }
 
 void readConfig(const std::string &filename) {
@@ -207,7 +214,7 @@ void printVerbose(bool vv, char const *const file, int const line, char const *c
     va_start(args, format);
 
 #if defined(_USE_LOGFILE)
-    if (!logFile.is_open()) { logFile.open("log.txt"); }
+    if (!logFile.is_open()) { logFile.open(Config::TRACE_FILE); }
     if (vv) logFile << file << ":" << line << ":" << function << " ";
     char buffer[1024];
     vsnprintf(buffer, sizeof(buffer), format, args);
@@ -248,4 +255,15 @@ std::string getSizeDetails(ByteCount bytes) {
     ss << "Size: " << nRecords << " records / " << bytes << " bytes / " << kilobytes << " KB / "
        << megabytes << " MB";
     return ss.str();
+}
+
+void prettyPrintPercentage(double perc) {
+    int i = 0;
+    for (; i < perc; ++i) // consumed
+        printvv("=");
+    printvv(">");
+    for (; i < 100; i++) // remaining
+        printvv(".");
+    printvv("\n");
+    flushvv();
 }

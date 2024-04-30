@@ -18,9 +18,6 @@
 #include <vector>
 
 
-// #define ROUNDUP(x, byY) (((x) + (byY - 1)) & ~(byY - 1))
-// #define ROUNDDOWN(x, byY) ((x) & ~(byY - 1))
-#define ROUNDUP_4K(x) (((x) + 4095) & ~4095)
 #define BYTE_TO_KB(x) ((x) / 1024)
 #define BYTE_TO_MB(x) ((x) / (1024 * 1024))
 #define BYTE_TO_GB(x) ((x) / (1024 * 1024 * 1024))
@@ -58,6 +55,15 @@ class Config {
     static int RECORD_KEY_SIZE;  // 8 bytes
     static int RECORD_SIZE;      // 1024 bytes
     static RowCount NUM_RECORDS; // 20 records
+    // ---- Duplicate ----
+    static RowCount NUM_DUPLICATES;
+    static RowCount NUM_DUPLICATES_REMOVED;
+    // ---- VERIFY ----
+    static std::string VERIFY_INPUTDIR;
+    static std::string VERIFY_OUTPUTDIR;
+    static bool VERIFY_ONLY;
+    static bool VERIFY;
+    static int VERIFY_HASH_BYTES;
     // ---- File ----
     static std::string OUTPUT_FILE;
     static std::string INPUT_FILE;
@@ -111,16 +117,18 @@ extern std::ofstream logFile;
 void printVerbose(bool vv, char const *const file, int const line, char const *const function,
                   const char *format, ...);
 void flushVerbose();
-#define printvv(...) printVerbose(true, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
-#define flushv() flushVerbose()
+#define printvv(...) printVerbose(false, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define printss(...) printVerbose(false, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+// #define printss(...) ((void)0)
+#define flushvv() flushVerbose()
 #if defined(_DEBUG) || defined(DEBUG)
 // Only define the printv and printvv macros if in a debug build
 #define printv(...) printVerbose(false, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__)
+#define flushv() flushVerbose()
 #else
 // Define empty macros when not in debug mode
 #define printv(...) ((void)0)
-// #define printvv(...) ((void)0)
-// #define flushv() ((void)0)
+#define flushv() ((void)0)
 #endif
 
 
@@ -131,6 +139,6 @@ void flushVerbose();
 
 ByteCount getFileSize(const std::string &filename);
 std::string getSizeDetails(ByteCount size);
-
+void prettyPrintPercentage(double perc);
 
 #endif // _CONFIG_H_

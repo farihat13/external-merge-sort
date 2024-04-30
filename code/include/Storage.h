@@ -3,9 +3,9 @@
 
 
 #include "Record.h"
-#include "Storage.h"
 #include "config.h"
 #include "defs.h"
+#include <cstddef>
 #include <cstdio>
 #include <cstring>
 #include <dirent.h>
@@ -24,6 +24,10 @@
 // ------------------------ RunManager ---------------------
 // =========================================================
 
+
+/**
+ * @brief RunManager class to manage runs in a storage device
+ */
 class RunManager {
   private:
     std::string baseDir;
@@ -31,23 +35,43 @@ class RunManager {
     int nextRunIndex = 0; // next run id
     RowCount totalRecords = 0;
 
+    /**
+     * @brief reads the run files from the baseDir and returns the list of run files.
+     */
     std::vector<std::string> getRunInfoFromDir();
 
   public:
+    /**
+     * @brief RunManager class to manage runs in a storage device.
+     * It creates a directory for the device runs.
+     * If the directory exists, it deletes all run files in the directory.
+     * @param deviceName
+     */
     RunManager(std::string deviceName);
+
+    /**
+     * @brief warns the user if all run files are not deleted
+     */
     ~RunManager();
 
-    // setters
+    // Setters
     void addRunFile(std::string filename, RowCount nRecords) {
         runFiles.push_back({filename, nRecords});
         totalRecords += nRecords;
     }
 
+    /**
+     * @brief removes the run file from the runFiles list.
+     * It also updates the totalRecords count.
+     */
     bool removeRunFile(std::string filename) {
+        // Find the run file
         auto it = std::find_if(
             runFiles.begin(), runFiles.end(),
             [filename](const std::pair<std::string, RowCount> &p) { return p.first == filename; });
+
         if (it != runFiles.end()) {
+            // Remove the run file and update the total records count
             totalRecords -= it->second;
             runFiles.erase(it);
             return true;
@@ -55,7 +79,7 @@ class RunManager {
         return false;
     }
 
-    // getters
+    // Getters
     std::string getBaseDir() { return baseDir; }
     RowCount getTotalRecords() { return totalRecords; }
     std::string getNextRunFileName();
@@ -82,19 +106,18 @@ class Storage {
     double LATENCY = 0;              // in ms
     // ---- calibrable configurations ----
     RowCount PAGE_SIZE_IN_RECORDS = 0; // in records
-    PageCount CLUSTER_SIZE = 0;        // in pages
-    int MAX_MERGE_FAN_IN = 45;         // #runs to merge at a time, or #input_clusters
+    int MAX_MERGE_FAN_IN = 95;         // #runs to merge at a time, or #input_clusters
     int MAX_MERGE_FAN_OUT = 5;         // #output_clusters
-    RowCount MERGE_FANIN_IN_RECORDS;   // total #records to merge at a time per input cluster
-    RowCount MERGE_FANOUT_IN_RECORDS;  // total #records that can be stored in output clusters
     // ---- read/write buffer ----
-    std::string readFilePath, writeFilePath;
+    std::string readFilePath;
     std::ifstream readFile;
-    std::ofstream writeFile;
 
   protected:
+    PageCount CLUSTER_SIZE = 0;       // in pages
+    RowCount MERGE_FANIN_IN_RECORDS;  // total #records to merge at a time per input cluster
+    RowCount MERGE_FANOUT_IN_RECORDS; // total #records that can be stored in output clusters
     // run manager
-    RunManager *runManager; // only for HDD and SSD
+    RunManager *runManager = nullptr; // only for HDD and SSD
     // ---- internal state ----
     RowCount _filled = 0; // updated by RunManager
     // used for merging
@@ -108,16 +131,35 @@ class Storage {
     Storage *spillTo = nullptr; // used for merging
     RunWriter *spillWriter = nullptr;
 
-    // setup
+    /**
+     * @brief Constructor for the Storage class
+     */
     Storage(std::string name, ByteCount capacity, int bandwidth, double latency);
+
+    /**
+     * @brief Configure the storage device based on the provided configurations.
+     * - Calculate the page size in records
+     * - Calculate the merge fan-in and merge fan-out in records and the cluster size
+     * - Create a run manager for HDD and SSD
+     */
     void configure();
+
+    /**
+     * @brief Set the spillTo storage device for spilling when this storage device is full.
+     */
     void setSpillTo(Storage *spillTo) {
         this->spillTo = spillTo;
         printv("%s set SpillTo to %s\n", this->getName().c_str(), spillTo->getName().c_str());
     }
 
+    /**
+     * @brief Destructor for the Storage class
+     */
     ~Storage() {
-        if (runManager != nullptr) { delete runManager; }
+        if (runManager != nullptr) {
+            delete runManager;
+            runManager = nullptr;
+        }
     }
 
   public:
@@ -136,9 +178,10 @@ class Storage {
     double getAccessTimeInSec(RowCount nRecords) const {
         return this->LATENCY + (nRecords * Config::RECORD_SIZE) / this->BANDWIDTH;
     }
-    int getAccessTimeInMillis(RowCount nRecords) const {
-        return (int)(this->getAccessTimeInSec(nRecords) * 1000);
+    double getAccessTimeInMillis(RowCount nRecords) const {
+        return (this->getAccessTimeInSec(nRecords) * 1000);
     }
+
     // ----------------------------- space calculations ------------------------
     // getters
     RowCount getTotalEmptySpaceInRecords() {
@@ -166,15 +209,39 @@ class Storage {
         _filled += nRecords;
     }
     void freeSpace(RowCount nRecords) {
-        if (_filled - nRecords < 0) {
-            throw std::runtime_error("ERROR: freeing more records than filled in " + this->name);
+        if (nRecords > _filled) {
+            std::string msg = "ERROR: freeing " + std::to_string(nRecords) +
+                              " records than filled in " + std::to_string(_filled) + " in " +
+                              this->name;
+            throw std::runtime_error(msg);
         }
         _filled -= nRecords;
     }
-    void fillInputCluster(RowCount nRecords) { _filledInputClusters += nRecords; }
-    void fillOutputCluster(RowCount nRecords) { _filledOutputClusters += nRecords; }
-    void freeInputCluster(RowCount nRecords) { _filledInputClusters -= nRecords; }
-    void freeOutputCluster(RowCount nRecords) { _filledOutputClusters -= nRecords; }
+    void fillInputCluster(RowCount nRecords) {
+        if (_filledInputClusters + nRecords > _totalSpaceInInputClusters) {
+            throw std::runtime_error("ERROR: filling more records than capacity in input clusters");
+        }
+        _filledInputClusters += nRecords;
+    }
+    void fillOutputCluster(RowCount nRecords) {
+        if (_filledOutputClusters + nRecords > _totalSpaceInOutputClusters) {
+            throw std::runtime_error(
+                "ERROR: filling more records than capacity in output clusters");
+        }
+        _filledOutputClusters += nRecords;
+    }
+    void freeInputCluster(RowCount nRecords) {
+        if (nRecords > _filledInputClusters) {
+            throw std::runtime_error("ERROR: freeing more records than filled in input clusters");
+        }
+        _filledInputClusters -= nRecords;
+    }
+    void freeOutputCluster(RowCount nRecords) {
+        if (nRecords > _filledOutputClusters) {
+            throw std::runtime_error("ERROR: freeing more records than filled in output clusters");
+        }
+        _filledOutputClusters -= nRecords;
+    }
     void resetAllFilledSpace() {
         _filled = 0;
         _filledInputClusters = 0;
@@ -190,29 +257,25 @@ class Storage {
         _totalSpaceInInputClusters = 0;
         _totalSpaceInOutputClusters = 0;
     }
-    // virtual void setupMergeState(RowCount outputDevicePageSize, int fanIn) = 0;
-    // /**
-    //  * @brief Setup merging state for dram (used for merging miniruns)
-    //  */
-    // virtual int setupMergeStateForMiniruns(RowCount outputDevicePageSize) = 0;
 
     // --------------------------- FILE I/O ------------------------------------
     std::string getReadFilePath() const { return readFilePath; }
-    std::string getWriteFilePath() const { return writeFilePath; }
     bool readFrom(const std::string &filePath);
-    bool writeTo(const std::string &filePath);
     std::streampos getReadPosition() { return readFile.tellg(); }
-    char *readRecords(RowCount *nRecords);
+    RowCount readRecords(char *data, RowCount nRecords);
     // cleanup
     void closeRead();
-    void closeWrite();
 
     // ---------------------------- run management ----------------------------
     RunWriter *getRunWriter();
-    RowCount writeNextChunk(RunWriter *writer, Run &run);
+    RowCount writeNextChunk(RunWriter *writer, Run *run);
     void closeWriter(RunWriter *writer);
     void addRunFile(std::string filename, RowCount nRecords) {
         runManager->addRunFile(filename, nRecords);
+    }
+    std::string getBaseDir() {
+        if (runManager == nullptr) { return ""; }
+        return runManager->getBaseDir();
     }
     // ---- spill session ----
     void spill(RunWriter *writer);
@@ -222,85 +285,16 @@ class Storage {
         if (runManager == nullptr) { return 0; }
         return runManager->getStoredRunsSortedBySize().size();
     }
+    std::string getRunfile(int index) {
+        if (runManager == nullptr) { return ""; }
+        return runManager->getStoredRunsSortedBySize()[index].first;
+    }
 
     // ---------------------------- printing -----------------------------------
     std::string reprUsageDetails();
     void printStoredRunFiles();
 
 }; // class Storage
-
-
-// =========================================================
-// ----------------------- RunStreamer ---------------------
-// =========================================================
-
-
-/**
- * @brief RunStreamer is a class to stream records from a run
- * It can be used to stream records from a run in memory or from a file
- * If the run is in memory, it will stream records from the run
- * If the run is on disk, it will stream records from the file
- */
-class RunStreamer {
-  private:
-    /** NOTE: must update currentRecord in moveNext */
-    Record *currentRecord;
-    // if reader is not null, it will stream records from file
-    // otherwise, it will stream records until currentRecord->next is null
-    RunReader *reader = nullptr;
-    // if the input is a runstreamer;
-    RunStreamer *streamer = nullptr;
-    Storage *fromDevice = nullptr;
-    Storage *toDevice = nullptr;
-    Page *currentPage = nullptr;
-    PageCount readAhead = 1;
-    // read ahead pages
-    RowCount readAheadPages(int nPages);
-
-    Record *moveNextForRun();
-    Record *moveNextForReader();
-    Record *moveNextForStreamer();
-
-  public:
-    RunStreamer(Run *run);
-    RunStreamer(RunReader *reader, Storage *fromDevice, Storage *toDevice, PageCount readAhead = 1);
-    RunStreamer(RunStreamer *streamer, Storage *fromDevice, Storage *toDevice,
-                PageCount readAhead = 1);
-
-    // getters
-    Record *getCurrRecord() { return currentRecord; }
-    Record *moveNext();
-    std::string getName() {
-        std::string name = "RS:";
-        if (reader != nullptr) {
-            name += " reader: " + reader->getFilename();
-        } else if (streamer != nullptr) {
-            name += " streamer: " + streamer->getName();
-        } else {
-            name += " InMemory";
-        }
-        return name;
-    }
-
-    std::string getFilename() {
-        if (reader != nullptr) {
-            return reader->getFilename();
-        } else if (streamer != nullptr) {
-            return streamer->getFilename();
-        }
-        return "InMemory";
-    }
-
-    // default comparison based on first 8 bytes of data
-    bool operator<(const RunStreamer &other) const { return *currentRecord < *other.currentRecord; }
-    bool operator>(const RunStreamer &other) const { return *currentRecord > *other.currentRecord; }
-    // equality comparison based on all bytes of data
-    bool operator==(const RunStreamer &other) const {
-        return *currentRecord == *other.currentRecord;
-    }
-
-    char *repr() { return currentRecord->reprKey(); }
-}; // class RunStreamer
 
 
 #endif // _STORAGE_H_

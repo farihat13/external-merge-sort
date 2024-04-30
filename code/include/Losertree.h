@@ -3,6 +3,7 @@
 
 
 #include "Record.h"
+#include "RunStreamer.h"
 #include "Storage.h"
 #include <algorithm>
 #include <cassert>
@@ -19,13 +20,14 @@ class LoserTree {
     std::vector<RunStreamer *> loserTree;
     std::vector<int> indices;
     RunStreamer *dummy;
+    Run *dummyRun;
 
     bool isMax(RunStreamer *r) { return isRecordMax(r->getCurrRecord()); }
 
   public:
     LoserTree() {
-        Run *dummyRun = new Run(getMaxRecord(), 1);
-        dummy = new RunStreamer(dummyRun);
+        dummyRun = new Run(getMaxRecord(), 1);
+        dummy = new RunStreamer(StreamerType::INMEMORY_RUN, dummyRun);
         // set the current time reabable format as name
         std::time_t ct = std::time(0);
         name = std::string(ctime(&ct));
@@ -37,6 +39,10 @@ class LoserTree {
             if (loserTree[i] != dummy) { delete loserTree[i]; }
         }
         printv("\t\t\t\tDeleted loser tree (%s)\n", name.c_str());
+        // NOTE: do not delete dummyRun, it uses maxRecord which is a global
+        dummyRun->setHead(nullptr);
+        delete dummyRun;
+        delete dummy;
     }
 
     // print the tree
@@ -58,7 +64,7 @@ class LoserTree {
     void constructTree(std::vector<Run> &inputs) {
         std::vector<RunStreamer *> runStreamers;
         for (size_t i = 0; i < inputs.size(); i++) {
-            runStreamers.push_back(new RunStreamer(&inputs[i]));
+            runStreamers.push_back(new RunStreamer(StreamerType::INMEMORY_RUN, &inputs[i]));
         }
         constructTree(runStreamers);
     }
