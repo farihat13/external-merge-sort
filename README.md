@@ -93,7 +93,7 @@ The capactity, bandwidth, and latency of different devices are kept in a `Config
 ### Quicksort
 We use quicksort for sorting cache-size inputs. The function `quickSort()` is in `StorageTypes.cpp:Line630:660`.
 
-### Cached Size Mini Runs
+### Cache Size Mini Runs
 We generate cache-size mini runs on the input loaded to memory. This is inside `genMiniRuns()` function in `StorageTypes.cpp:Line770-800`.
 
 ### Tournament (Loser) Tree
@@ -101,7 +101,7 @@ We use loser tree to merge the input buffers. It is implemented in `LoserTree` c
 This facilitates performing a merge where some runs are originally in SSD and some are in HDD.
 
 ### Minimum Count of Rows
-
+We use loser tree instead of winner tree or priority queue to minimize the number of comparisons during merging. The code for loser tree is available in `Losertree.h` inside `include` folder.
 
 ### Duplicate Removal
 We remove duplicate during merging using Loser tree. When we remove a element from Loser tree, we first check if it is duplicate or not. If it is, then we skip this. It happens in three functions: `genMiniRuns()`,
@@ -117,7 +117,6 @@ the functions `genMiniRuns()`, `mergeSSDRuns()` and `mergeHDDRuns()` in  `Storag
 ### Spilling SSD to Disk
 When merging runs stored in SSD using `mergeSSDRuns` and runs stored in HDD in `mergeHDDRuns`, we spill our merged runs to SSD first when our in-memory output buffer gets full. Eventually, the SSD output buffer gets full, we spill the merged runs to HDD then. 
 We keep writing the run to SSD using `writeNextChunk()`. When the SSD gets full, this function instead of writing to SSD, starts a spill session by calling `spill()`. A spill session spills one particular merged run. Each device has a `spillTo` device set, which they use to spill the data. The `spill()` is inside `Storage.cpp:Line155-185`. The code for `startSpillSession()` and `endSpillSession()` is in `Storage.cpp:Line215-250`.
-
 
 ### Graceful Degradation
 We perform graceful degradation, by first spilling Run to SSD and freeing up space in in-memory output buffer, and later when SSD output buffer gets filled, we free up space in SSD output buffer by spilling to HDD. The graceful degradation happens in `genMiniRuns()`, `mergeSSDRuns()` and `mergeHDDRuns()`. For example, in `genMiniRuns()`, we move some runs to SSD to make space for output buffer. The code is available in `StorageTypes.cpp:Line820-840`.
@@ -135,14 +134,12 @@ We verify both the sort order and sort integrity. The order ensures the output i
 
 **You can find example traces in this** [link](https://uwprod-my.sharepoint.com/:f:/g/personal/fislam2_wisc_edu/EhzBXejcjONImt8O0yjK4swBlzK4NjYLqI-4c9495Z3vAg?e=bfmE3A).
 
-The following run durations are the result of running in cloudlab with nvme SSD.
+The following run durations are the result of running in cloudlab with nvme SSD. We show the result of runs in various settings.
 
 ### 1GB
 `-c 1200000 -s 1000`
 - Input_Gen Duration 4 seconds / 0 minutes
 - External_Merge_Sort Total Duration 2 seconds / 0 minutes
-- Order Verification Duration 0 seconds / 0 minutes
-- Integrity Verification Duration 2 seconds / 0 minutes
 
 ### 10GB
 `-c 6000000 -s 2048`
@@ -150,6 +147,9 @@ The following run durations are the result of running in cloudlab with nvme SSD.
 - External_Merge_Sort Total Duration 25 seconds / 0 minutes
 
 ### 25GB
+`-c 1330000000 -s 20`
+- Input_Gen Duration 111 seconds / 1 minutes
+- External_Merge_Sort Total Duration 1300 seconds / 21 minutes
 
 ### 50GB
 `-c 53000000 -s 1024 `
@@ -157,6 +157,9 @@ The following run durations are the result of running in cloudlab with nvme SSD.
 - External_Merge_Sort Total Duration 222 seconds / 3 minutes
 
 ### 125GB
+`-c 132000000 -s 1024`
+- Input_Gen Duration 519 seconds / 8 minutes
+- External_Merge_Sort Total Duration 560 seconds / 9 minutes
 
 ## Members and Contributions
 
