@@ -123,6 +123,7 @@ void Storage::configure() {
     ByteCount nBytes = this->BANDWIDTH * this->LATENCY;
     nBytes = RoundUp(nBytes, 4 * 1024); // round up to 4KB
     PAGE_SIZE_IN_RECORDS = nBytes / Config::RECORD_SIZE;
+    PAGE_SIZE_IN_RECORDS = std::max((RowCount)1, PAGE_SIZE_IN_RECORDS);
     printvv("\tConfigured %s\n", this->name.c_str());
     printvv("\tPage %s\n",
             getSizeDetails(this->PAGE_SIZE_IN_RECORDS * Config::RECORD_SIZE).c_str());

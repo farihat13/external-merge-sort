@@ -73,7 +73,11 @@ RowCount genInputBatch(const std::string &filename, const RowCount count) {
     std::ofstream input_file(tmpfilename, std::ios::binary | std::ios::trunc);
 
     // Calculate batch size and number of batches
-    RowCount batchSize = 4096 * 2;
+    RowCount batchSize = 4096;
+    if (batchSize * Config::RECORD_SIZE > 1024*1024*1024) {
+        batchSize = 1024*1024*1024 / Config::RECORD_SIZE;
+        batchSize = std::min(batchSize, (RowCount) 2);
+    }
     batchSize = std::min(batchSize, count);
     if (batchSize % 2 != 0) { batchSize--; }
     RowCount nBatches = batchSize == 0 ? 0 : (count / batchSize);
