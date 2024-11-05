@@ -1,4 +1,4 @@
-# CS764 External Merge Sort
+# External Merge Sort
 
 ## Setup and Run
 
